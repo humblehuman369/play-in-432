@@ -55,7 +55,32 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (usually `http://localhost:5173`).
+Open the URL Vite prints (usually `http://127.0.0.1:5173/` for Spotify).
+
+### Deploy on Vercel
+
+This is a static Vite app (`dist/`). Config is in `vercel.json`.
+
+```bash
+cd truehz-player
+npm i -g vercel   # if needed
+vercel login
+vercel            # first deploy (preview)
+vercel --prod     # production
+```
+
+Or: push this repo to GitHub → [vercel.com/new](https://vercel.com/new) → import project  
+(Framework: Vite · Build: `npm run build` · Output: `dist`).
+
+**Domain playin432.com**
+
+1. Vercel project → **Settings → Domains** → add `playin432.com` (and optional `www`).
+2. In GoDaddy DNS, **replace** the parking A records with the values Vercel shows (often `A @ → 76.76.21.21` and/or a CNAME for `www`).
+3. Wait for HTTPS (automatic). Confirm `https://playin432.com`.
+4. Spotify redirect URIs: `https://playin432.com/` and `http://127.0.0.1:5173/`.
+5. Optional env in Vercel: `VITE_SPOTIFY_CLIENT_ID` (rebuild after set).
+
+Music stays in the **user’s browser IndexedDB** — Vercel only hosts the app files.
 
 ### Playlist import
 
