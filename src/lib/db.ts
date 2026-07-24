@@ -87,50 +87,161 @@ export async function getTrackArtwork(id: string): Promise<Blob | null> {
 }
 
 export type NewTrackInput = {
-  file: File;
+  file: File | Blob;
   name?: string;
+  /** Original filename for extension / mime fallback */
+  fileName?: string;
   artist?: string | null;
   album?: string | null;
   artworkBlob?: Blob | null;
 };
 
+/**
+ * iOS/WebKit often fails to persist raw File handles in IndexedDB after
+ * async tag reads. Materialize a plain Blob from ArrayBuffer first.
+ */
+async function materializeBlob(
+  source: Blob,
+  mimeHint?: string,
+): Promise<Blob> {
+  const type = source.type || mimeHint || "application/octet-stream";
+  if (source.size === 0) {
+    throw new Error("Audio file is empty (0 bytes). Try another file.");
+  }
+  try {
+    const buf = await source.arrayBuffer();
+    if (!buf.byteLength) {
+      throw new Error("Could not read audio data from the file.");
+    }
+    return new Blob([buf], { type });
+  } catch (e) {
+    if (e instanceof Error && /empty|Could not read/i.test(e.message)) throw e;
+    // Last resort: some environments already have a stable Blob
+    if (source instanceof Blob && source.size > 0) {
+      return source.slice(0, source.size, type);
+    }
+    throw e instanceof Error
+      ? e
+      : new Error("Failed to read audio file into memory.");
+  }
+}
+
+async function materializeArtwork(source: Blob | null): Promise<Blob | null> {
+  if (!source || source.size === 0) return null;
+  try {
+    const buf = await source.arrayBuffer();
+    if (!buf.byteLength) return null;
+    return new Blob([buf], { type: source.type || "image/jpeg" });
+  } catch {
+    return null;
+  }
+}
+
+function idbErrorMessage(err: unknown): string {
+  const name =
+    err && typeof err === "object" && "name" in err
+      ? String((err as { name: string }).name)
+      : "";
+  const msg = err instanceof Error ? err.message : String(err ?? "unknown");
+  if (name === "QuotaExceededError" || /quota/i.test(msg)) {
+    return "Device storage is full. Free space, then try importing again.";
+  }
+  if (/empty|Could not read|0 bytes/i.test(msg)) return msg;
+  return `Could not save to library: ${msg}`;
+}
+
+function isNewTrackInput(item: File | NewTrackInput): item is NewTrackInput {
+  return (
+    typeof item === "object" &&
+    item !== null &&
+    !(item instanceof File) &&
+    "file" in item &&
+    (item as NewTrackInput).file instanceof Blob
+  );
+}
+
+/**
+ * Add one track per transaction so a single failure does not wipe a batch,
+ * and so iOS can persist large audio blobs reliably.
+ */
 export async function addTracksFromFiles(
   files: File[] | NewTrackInput[],
 ): Promise<TrackMeta[]> {
   if (!files.length) return [];
-  const db = await openDb();
-  const tx = db.transaction(STORE_TRACKS, "readwrite");
-  const store = tx.objectStore(STORE_TRACKS);
   const created: TrackMeta[] = [];
   const now = Date.now();
+  const errors: string[] = [];
 
   for (const item of files) {
-    const isInput = !(item instanceof File);
-    const file = isInput ? item.file : item;
-    const fallbackName = file.name.replace(/\.[^/.]+$/, "") || file.name;
-    const artworkBlob = isInput ? (item.artworkBlob ?? null) : null;
-    const record: TrackRecord = {
-      id: uid("trk_"),
-      name: (isInput && item.name) || fallbackName,
-      size: file.size,
-      duration: null,
-      mimeType: file.type || "audio/mpeg",
-      addedAt: now,
-      playCount: 0,
-      lastPlayedAt: null,
-      favorite: false,
-      artist: isInput ? (item.artist ?? null) : null,
-      album: isInput ? (item.album ?? null) : null,
-      hasArtwork: Boolean(artworkBlob),
-      blob: file,
-      artworkBlob,
-    };
-    store.put(record);
-    created.push(trackMetaFromRecord(record));
+    const input = isNewTrackInput(item) ? item : null;
+    const file: Blob = input ? input.file : (item as File);
+    const fileName =
+      input?.fileName ||
+      (file instanceof File ? file.name : null) ||
+      input?.name ||
+      "track.mp3";
+    const fallbackName = fileName.replace(/\.[^/.]+$/, "") || fileName;
+    const mimeType =
+      file.type ||
+      (/\.flac$/i.test(fileName)
+        ? "audio/flac"
+        : /\.wav$/i.test(fileName)
+          ? "audio/wav"
+          : /\.m4a$/i.test(fileName)
+            ? "audio/mp4"
+            : "audio/mpeg");
+
+    try {
+      const blob = await materializeBlob(file, mimeType);
+      const artworkBlob = await materializeArtwork(input?.artworkBlob ?? null);
+      const record: TrackRecord = {
+        id: uid("trk_"),
+        name: input?.name || fallbackName,
+        size: blob.size,
+        duration: null,
+        mimeType: blob.type || mimeType,
+        addedAt: now,
+        playCount: 0,
+        lastPlayedAt: null,
+        favorite: false,
+        artist: input?.artist ?? null,
+        album: input?.album ?? null,
+        hasArtwork: Boolean(artworkBlob),
+        blob,
+        artworkBlob,
+      };
+
+      const db = await openDb();
+      try {
+        const tx = db.transaction(STORE_TRACKS, "readwrite");
+        const store = tx.objectStore(STORE_TRACKS);
+        await reqToPromise(store.put(record));
+        await txDone(tx);
+      } finally {
+        db.close();
+      }
+
+      // Verify row actually landed (catches silent WebKit failures)
+      const check = await getTrack(record.id);
+      if (!check?.blob || check.blob.size === 0) {
+        throw new Error(
+          "Saved track is missing audio data. Storage may be blocked.",
+        );
+      }
+
+      created.push(trackMetaFromRecord(record));
+    } catch (e) {
+      console.error("[library] add track failed", fileName, e);
+      errors.push(`${fallbackName}: ${idbErrorMessage(e)}`);
+    }
   }
 
-  await txDone(tx);
-  db.close();
+  if (!created.length && errors.length) {
+    throw new Error(errors[0]);
+  }
+  if (errors.length && created.length) {
+    console.warn("[library] partial import", errors);
+  }
   return created;
 }
 
@@ -375,4 +486,36 @@ export async function libraryStats(): Promise<{
     totalBytes: tracks.reduce((s, t) => s + t.size, 0),
     playlistCount: playlists.length,
   };
+}
+
+// ── Pro entitlement backup (same origin as library) ─────────────────
+
+const PRO_SETTINGS_KEY = "pro_entitlement";
+
+/** Persist Pro session id into IndexedDB (backup for localStorage). */
+export async function openDbForPro(sessionId: string | null): Promise<void> {
+  const db = await openDb();
+  const tx = db.transaction(STORE_SETTINGS, "readwrite");
+  if (sessionId) {
+    tx.objectStore(STORE_SETTINGS).put({
+      key: PRO_SETTINGS_KEY,
+      value: { sessionId, activatedAt: Date.now() },
+    });
+  } else {
+    tx.objectStore(STORE_SETTINGS).delete(PRO_SETTINGS_KEY);
+  }
+  await txDone(tx);
+  db.close();
+}
+
+export async function loadProFromDb(): Promise<string | null> {
+  const db = await openDb();
+  const tx = db.transaction(STORE_SETTINGS, "readonly");
+  const row = (await reqToPromise(
+    tx.objectStore(STORE_SETTINGS).get(PRO_SETTINGS_KEY),
+  )) as { key: string; value?: { sessionId?: string } } | undefined;
+  await txDone(tx);
+  db.close();
+  const id = row?.value?.sessionId;
+  return typeof id === "string" && id.length > 0 ? id : null;
 }

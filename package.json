@@ -1,28 +1,47 @@
 {
   "name": "play-in-432",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "mobile:sync": "npm run build && npx cap sync",
+    "mobile:ios": "npm run mobile:sync && npx cap open ios",
+    "mobile:android": "npm run mobile:sync && npx cap open android",
+    "mobile:run:ios": "npm run mobile:sync && npx cap run ios",
+    "mobile:run:android": "npm run mobile:sync && npx cap run android"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/core": "^8.4.2",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/share": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
+    "@revenuecat/purchases-capacitor": "^13.2.3",
     "lucide-react": "^1.25.0",
     "music-metadata": "^11.14.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "rubberband-wasm": "^3.3.0",
-    "soundtouchjs": "^0.3.0"
+    "soundtouchjs": "^0.3.0",
+    "stripe": "^17.7.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/cli": "^8.4.2",
+    "@capacitor/ios": "^8.4.2",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "oxlint": "^1.71.0",
+    "playwright": "^1.49.0",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"
   }

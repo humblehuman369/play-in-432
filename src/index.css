@@ -31,10 +31,28 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
+  min-height: 100dvh;
 }
 
 body {
   min-width: 320px;
+  /* Safe areas for notched phones (Capacitor / iOS / Android) */
+  padding-top: env(safe-area-inset-top, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding-left: env(safe-area-inset-left, 0);
+  padding-right: env(safe-area-inset-right, 0);
+  background-color: #070b0f;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Capacitor: allow text selection in content areas only */
+input,
+textarea,
+[contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 button,

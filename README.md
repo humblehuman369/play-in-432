@@ -79,8 +79,39 @@ Or: push this repo to GitHub → [vercel.com/new](https://vercel.com/new) → im
 3. Wait for HTTPS (automatic). Confirm `https://playin432.com`.
 4. Spotify redirect URIs: `https://playin432.com/` and `http://127.0.0.1:5173/`.
 5. Optional env in Vercel: `VITE_SPOTIFY_CLIENT_ID` (rebuild after set).
+6. Stripe TrueHz Pro — see below.
 
-Music stays in the **user’s browser IndexedDB** — Vercel only hosts the app files.
+Music stays in the **user’s browser IndexedDB** — Vercel only hosts the app files (+ Stripe API routes).
+
+### TrueHz Pro · Stripe ($19 one-time)
+
+| Free forever | TrueHz Pro |
+|--------------|------------|
+| Live A=440 → A=432 | All Solfeggio / custom targets |
+| Library, playlists, Learn | Unlimited HQ WAV (TrueHz Convert) |
+| 3 HQ exports | One-time payment, no subscription |
+
+**Vercel env (Production + Preview):**
+
+```bash
+vercel env add STRIPE_SECRET_KEY production
+# paste sk_test_… or sk_live_…
+
+# optional fixed Stripe Price id
+# vercel env add STRIPE_PRICE_ID production
+
+# optional APP_URL=https://playin432.com
+```
+
+**Stripe Dashboard**
+
+1. [API keys](https://dashboard.stripe.com/apikeys) → Secret key  
+2. Optional: Product **TrueHz Pro** · one-time **$19** · copy Price ID → `STRIPE_PRICE_ID`  
+3. After pay, app returns to `/?checkout=success&session_id=…`, verifies via `/api/verify-checkout-session`, unlocks Pro on that browser  
+
+**API:** `api/create-checkout-session.js`, `api/verify-checkout-session.js`  
+
+**Local API:** use `vercel dev` (plain `npm run dev` is UI-only).
 
 ### Playlist import
 
@@ -97,6 +128,18 @@ In the [Spotify Dashboard](https://developer.spotify.com/dashboard), Redirect UR
 
 Open the app at **http://127.0.0.1:5173/** so the redirect matches.
 
+## Mobile (App Store + Google Play)
+
+Native shells use **Capacitor** (`ios/`, `android/`). Full guide: **[MOBILE.md](./MOBILE.md)**.
+
+```bash
+npm run mobile:sync      # web build → native projects
+npm run mobile:ios       # open Xcode
+npm run mobile:android   # open Android Studio
+```
+
+App ID: `com.playin432.app` · Name: **Play In 432**
+
 ## Project layout
 
 ```
@@ -107,6 +150,7 @@ src/
   lib/db.ts              IndexedDB: tracks, playlists, settings
   lib/playerEngine.ts    Web Audio + SoundTouch retune engine
   lib/exportRetune.ts    HQ export (Rubber Band) + SoundTouch fallback
+  lib/native.ts          Capacitor status bar / deep links
   workers/rubberbandWorker.ts  TrueHz Convert Rubber Band WASM worker
   lib/pitchDetect.ts     Concert-A estimate
   lib/mediaSession.ts    OS media keys

@@ -1,0 +1,10 @@
+# Keep Vercel deploys small (web only)
+android
+ios
+node_modules
+store-assets
+*.apk
+*.aab
+*.ipa
+.DS_Store
+.git

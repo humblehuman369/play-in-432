@@ -45,12 +45,13 @@ export function useLibrary() {
       setError(null);
       setImporting(true);
       try {
-        // Read ID3 tags before storing
+        // Read ID3 tags before storing (files are re-materialized in db layer)
         const inputs: db.NewTrackInput[] = [];
         for (const file of files) {
           const tags = await readMediaTags(file);
           inputs.push({
             file,
+            fileName: file.name,
             name: tags.title || undefined,
             artist: tags.artist,
             album: tags.album,
@@ -59,7 +60,16 @@ export function useLibrary() {
         }
         const created = await db.addTracksFromFiles(inputs);
         await refresh();
+        if (!created.length) {
+          setError("Import finished but no tracks were saved. Try again.");
+        }
         return created;
+      } catch (e) {
+        const msg =
+          e instanceof Error ? e.message : "Failed to save tracks to library.";
+        setError(msg);
+        console.error("[useLibrary] importFiles", e);
+        return [] as TrackMeta[];
       } finally {
         setImporting(false);
       }

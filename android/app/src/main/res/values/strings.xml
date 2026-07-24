@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Play In 432</string>
+    <string name="title_activity_main">Play In 432</string>
+    <string name="package_name">com.playin432.app</string>
+    <string name="custom_url_scheme">com.playin432.app</string>
+</resources>

@@ -629,11 +629,11 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
     setRepeat(order[(i + 1) % order.length]);
   }, [settings.repeat, setRepeat]);
 
-  const downloadRetuned = useCallback(async () => {
+  const downloadRetuned = useCallback(async (): Promise<boolean> => {
     const id = activeIdRef.current;
     if (!id) {
       setError("Load a track first, then download.");
-      return;
+      return false;
     }
     const track = tracks.find((t) => t.id === id);
     const s = settingsRef.current;
@@ -665,6 +665,7 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
           "HQ Rubber Band was unavailable — downloaded with preview-quality engine. Try again or use a shorter track.",
         );
       }
+      return true;
     } catch (e) {
       console.error(e);
       setError(
@@ -672,6 +673,7 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
           ? e.message
           : "HQ export failed. Try a shorter track or WAV source.",
       );
+      return false;
     } finally {
       setExporting(false);
       setExportProgress(0);

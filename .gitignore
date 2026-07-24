@@ -30,3 +30,30 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Capacitor / native
+android/.gradle
+android/app/build
+android/build
+android/captures
+android/local.properties
+ios/App/Pods
+ios/App/App/public
+ios/DerivedData
+*.xcuserstate
+.DS_Store
+
+.secrets/
+*.p8
+AuthKey_*.p8
+
+# Store build artifacts (keep docs/screenshots; never commit signed builds)
+*.apk
+*.aab
+*.ipa
+*.mobileprovision
+*.xcarchive/
+store-assets/**/*.xcarchive/
+store-assets/export/
+store-assets/**/dSYMs/
+store-assets/**/Products/

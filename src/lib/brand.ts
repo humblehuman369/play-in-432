@@ -22,9 +22,9 @@ export const BRAND = {
   tagline: "Your music, retuned to 432 — powered by TrueHz technology",
   /** Short tagline for headers */
   taglineShort: "Retune your music · TrueHz technology",
-  /** Meta description */
+  /** Meta description (SEO / social) */
   description:
-    "Play In 432 — upload music and play retuned A=440 → A=432 in your browser. Powered by TrueHz™ technology.",
+    "Play In 432: retune music you own to A=432 in the browser. Live playback + TrueHz Convert HQ export. Private — files stay on your device. Powered by TrueHz™.",
   /** Document title */
   title: "Play In 432 — Powered by TrueHz™",
   /** Media Session fallback artist */

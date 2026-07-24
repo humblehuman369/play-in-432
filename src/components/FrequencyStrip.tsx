@@ -1,3 +1,4 @@
+import { Lock } from "lucide-react";
 import {
   FREQUENCY_ANCHORS,
   formatHz,
@@ -12,6 +13,7 @@ import {
   impliedConcertA,
   reanchorPitchRatio,
 } from "../lib/retune";
+import { canUseTargetHz } from "../lib/pro";
 import type { PlayMode, RetuneStyle } from "../lib/types";
 
 type Props = {
@@ -25,6 +27,8 @@ type Props = {
   onOpenHowFarLearn?: () => void;
   /** Open Learn article on re-anchor */
   onOpenReanchorLearn?: () => void;
+  /** When true, Pro-only chips show a lock (still clickable → upgrade) */
+  showProLocks?: boolean;
 };
 
 export function FrequencyStrip({
@@ -36,6 +40,7 @@ export function FrequencyStrip({
   onRetuneStyleChange,
   onOpenHowFarLearn,
   onOpenReanchorLearn,
+  showProLocks = true,
 }: Props) {
   const active = matchAnchorTarget(sourceA, targetA, mode);
   const ratio =
@@ -94,18 +99,21 @@ export function FrequencyStrip({
         {FREQUENCY_ANCHORS.map((a) => {
           const on = active?.hz === a.hz;
           const mapped = findReanchorNote(a.hz);
+          const locked = showProLocks && !canUseTargetHz(a.hz);
           return (
             <button
               key={a.hz}
               type="button"
               role="option"
               aria-selected={on}
-              className={`freq-chip ${on ? "on" : ""} ${a.featured ? "featured" : ""}`}
+              className={`freq-chip ${on ? "on" : ""} ${a.featured ? "featured" : ""} ${locked ? "locked" : ""}`}
               onClick={() => onSelect(a)}
               title={
-                mapped
-                  ? `${a.name} · ${mapped.note} @ ${a.hz} Hz — ${a.note}`
-                  : `${a.name} — ${a.note}`
+                locked
+                  ? `${a.name} — TrueHz Pro`
+                  : mapped
+                    ? `${a.name} · ${mapped.note} @ ${a.hz} Hz — ${a.note}`
+                    : `${a.name} — ${a.note}`
               }
             >
               {mapped && !a.isOriginal ? (
@@ -115,7 +123,10 @@ export function FrequencyStrip({
                   ·
                 </span>
               )}
-              <span className="freq-chip-hz">{a.label}</span>
+              <span className="freq-chip-hz">
+                {a.label}
+                {locked && <Lock size={10} className="freq-lock" aria-hidden />}
+              </span>
               <span className="freq-chip-name">{a.name}</span>
             </button>
           );
