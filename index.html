@@ -2,31 +2,129 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0"
     />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Primary SEO -->
+    <title>Play In 432 — Retune Your Music to 432 Hz | TrueHz™</title>
     <meta
       name="description"
-      content="Play In 432: retune music you own to A=432 in the browser. Live playback + TrueHz Convert HQ export. Private — files stay on your device. Powered by TrueHz™."
+      content="Play In 432 is a private music player that retunes tracks you already own to A=432 (and more). Live TrueHz™ playback, HQ WAV export, library & playlists — all on your device. No account. No uploads."
     />
+    <meta
+      name="keywords"
+      content="432 Hz, 432hz player, retune music, A440 to A432, TrueHz, pitch shift, Solfeggio, 528 Hz, HQ WAV export, private music player, on-device audio"
+    />
+    <meta name="author" content="Rise In Harmony" />
+    <meta name="creator" content="Play In 432" />
+    <meta name="publisher" content="Rise In Harmony" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="googlebot" content="index, follow" />
+    <meta name="theme-color" content="#00d4aa" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="application-name" content="Play In 432" />
+    <meta name="rating" content="General" />
+    <link rel="canonical" href="https://playin432.com/" />
+
+    <!-- Icons / PWA-style -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Play In 432" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-title" content="Play In 432" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Play In 432" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content="https://playin432.com/" />
     <meta property="og:title" content="Play In 432 — Your music, retuned to 432" />
     <meta
       property="og:description"
-      content="Upload your tracks. Hear A=440 → A=432 live. TrueHz™ technology. No account. Files never leave your device."
+      content="Drop your tracks. Hear A=440 → A=432 live with TrueHz™. Private on-device library, HQ WAV export, honest Learn content. Free for 432 listening."
     />
-    <meta property="og:url" content="https://playin432.com" />
     <meta property="og:image" content="https://playin432.com/hero-wave.jpg" />
+    <meta property="og:image:secure_url" content="https://playin432.com/hero-wave.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:alt" content="Play In 432 — TrueHz retune player waveform" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Play In 432 — Your music, retuned to 432" />
+    <meta
+      name="twitter:description"
+      content="Private 432 Hz player powered by TrueHz™. Live retune, HQ export, files never leave your device."
+    />
     <meta name="twitter:image" content="https://playin432.com/hero-wave.jpg" />
+    <meta name="twitter:image:alt" content="Play In 432 — TrueHz retune player" />
+    <meta name="twitter:url" content="https://playin432.com/" />
+
+    <!-- App store / product hints (web) -->
+    <meta name="apple-itunes-app" content="app-id=6792840657" />
     <link rel="preload" as="image" href="/hero-wave.jpg" />
-    <meta name="theme-color" content="#00d4aa" />
-    <title>Play In 432 — Powered by TrueHz™</title>
+
+    <!-- Structured data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://playin432.com/#website",
+            "url": "https://playin432.com/",
+            "name": "Play In 432",
+            "description": "Private music player that retunes your files to 432 Hz with TrueHz technology.",
+            "publisher": { "@id": "https://playin432.com/#organization" },
+            "inLanguage": "en-US"
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://playin432.com/#organization",
+            "name": "Rise In Harmony",
+            "url": "https://playin432.com/",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://playin432.com/icons/icon-512.png"
+            }
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://playin432.com/#app",
+            "name": "Play In 432",
+            "applicationCategory": "MusicApplication",
+            "operatingSystem": "iOS, Android, Web",
+            "url": "https://playin432.com/",
+            "image": "https://playin432.com/hero-wave.jpg",
+            "description": "Retune music you own to A=432 with live playback and TrueHz Convert HQ export. Private on-device library — no account required.",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD",
+              "description": "Free 432 listening; optional TrueHz Pro unlock"
+            },
+            "featureList": [
+              "Live A=440 to A=432 retune",
+              "TrueHz pure-tone bed",
+              "HQ WAV export (TrueHz Convert)",
+              "On-device library and playlists",
+              "Optional Spotify playlist metadata match"
+            ],
+            "author": { "@id": "https://playin432.com/#organization" },
+            "downloadUrl": "https://playin432.com/",
+            "installUrl": "https://apps.apple.com/app/id6792840657"
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
