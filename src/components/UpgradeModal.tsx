@@ -27,7 +27,7 @@ const COPY: Record<UpgradeReason, { title: string; body: string }> = {
   },
   export: {
     title: "HQ export limit reached",
-    body: `Free includes ${FREE_HQ_EXPORT_LIMIT} TrueHz Convert HQ WAV downloads. Pro unlocks unlimited high-quality exports.`,
+    body: `Free includes ${FREE_HQ_EXPORT_LIMIT} TrueHz Convert HQ downloads (WAV or MP3). Pro unlocks unlimited high-quality exports.`,
   },
   general: {
     title: "TrueHz Pro",

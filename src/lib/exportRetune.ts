@@ -10,25 +10,33 @@ import {
   SoundTouch,
   WebAudioBufferSource,
 } from "soundtouchjs";
+import { Mp3Encoder } from "@breezystack/lamejs";
 import {
   effectivePitchRatio,
   safeFileStem,
   type RetuneStyle,
 } from "./retune";
 import { BRAND } from "./brand";
+import type { ExportFormat } from "./types";
 import type {
   RubberBandWorkerIn,
   RubberBandWorkerOut,
 } from "../workers/rubberbandWorker";
 
 const CHUNK_FRAMES = 4096;
+/** LAME-friendly rates; other sample rates are linearly resampled. */
+const MP3_RATES = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000] as const;
+const MP3_BITRATE_KBPS = 320;
+const MP3_BLOCK = 1152;
 
 export type ExportEngine = "rubberband" | "soundtouch";
+export type { ExportFormat };
 
 export type ExportResult = {
   engine: ExportEngine;
   /** True when Rubber Band was requested but SoundTouch fallback ran. */
   usedFallback: boolean;
+  format: ExportFormat;
 };
 
 /**
@@ -368,6 +376,108 @@ export function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
   return new Blob([ab], { type: "audio/wav" });
 }
 
+function floatTo16BitPCM(input: Float32Array): Int16Array {
+  const out = new Int16Array(input.length);
+  for (let i = 0; i < input.length; i++) {
+    const s = Math.max(-1, Math.min(1, input[i]));
+    out[i] = (s < 0 ? s * 0x8000 : s * 0x7fff) | 0;
+  }
+  return out;
+}
+
+function pickMp3SampleRate(rate: number): number {
+  if ((MP3_RATES as readonly number[]).includes(rate)) return rate;
+  // Prefer nearest standard rate (usually 48k for high-rate sources).
+  let best = 48000;
+  let bestDist = Infinity;
+  for (const r of MP3_RATES) {
+    const d = Math.abs(r - rate);
+    if (d < bestDist) {
+      best = r;
+      bestDist = d;
+    }
+  }
+  return best;
+}
+
+/** Linear resample one channel to a new length. */
+function resampleChannel(src: Float32Array, outLen: number): Float32Array {
+  if (src.length === outLen) return src;
+  if (outLen <= 0) return new Float32Array(0);
+  const out = new Float32Array(outLen);
+  const ratio = (src.length - 1) / Math.max(1, outLen - 1);
+  for (let i = 0; i < outLen; i++) {
+    const pos = i * ratio;
+    const i0 = Math.floor(pos);
+    const i1 = Math.min(src.length - 1, i0 + 1);
+    const t = pos - i0;
+    out[i] = src[i0] * (1 - t) + src[i1] * t;
+  }
+  return out;
+}
+
+/**
+ * Encode AudioBuffer as stereo (or mono) MP3 via LAME (browser-side).
+ * Default 320 kbps. Yields occasionally so long albums stay responsive.
+ */
+export async function audioBufferToMp3Blob(
+  buffer: AudioBuffer,
+  onProgress?: (fraction: number) => void,
+  kbps: number = MP3_BITRATE_KBPS,
+): Promise<Blob> {
+  const numChannels = Math.min(2, buffer.numberOfChannels) as 1 | 2;
+  const targetRate = pickMp3SampleRate(buffer.sampleRate);
+  const outLen =
+    targetRate === buffer.sampleRate
+      ? buffer.length
+      : Math.max(1, Math.round(buffer.length * (targetRate / buffer.sampleRate)));
+
+  let leftF: Float32Array = new Float32Array(buffer.getChannelData(0));
+  let rightF: Float32Array = new Float32Array(
+    numChannels > 1 ? buffer.getChannelData(1) : buffer.getChannelData(0),
+  );
+  if (outLen !== buffer.length) {
+    leftF = resampleChannel(leftF, outLen);
+    rightF = resampleChannel(rightF, outLen);
+  }
+
+  const left = floatTo16BitPCM(leftF);
+  const right = floatTo16BitPCM(rightF);
+  const encoder = new Mp3Encoder(numChannels, targetRate, kbps);
+  const parts: BlobPart[] = [];
+  let encoded = 0;
+
+  for (let i = 0; i < left.length; i += MP3_BLOCK) {
+    const end = Math.min(i + MP3_BLOCK, left.length);
+    const lChunk = left.subarray(i, end);
+    const rChunk = right.subarray(i, end);
+    // LAME expects full block size; pad last frame with zeros.
+    let l = lChunk;
+    let r = rChunk;
+    if (lChunk.length < MP3_BLOCK) {
+      l = new Int16Array(MP3_BLOCK);
+      r = new Int16Array(MP3_BLOCK);
+      l.set(lChunk);
+      r.set(rChunk);
+    }
+    const mp3buf =
+      numChannels === 1
+        ? encoder.encodeBuffer(l)
+        : encoder.encodeBuffer(l, r);
+    if (mp3buf.length > 0) parts.push(new Int8Array(mp3buf));
+    encoded = end;
+    if (encoded % (MP3_BLOCK * 32) === 0) {
+      onProgress?.(Math.min(0.99, encoded / left.length));
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
+  const tail = encoder.flush();
+  if (tail.length > 0) parts.push(new Int8Array(tail));
+  onProgress?.(1);
+  return new Blob(parts, { type: "audio/mpeg" });
+}
+
 export function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -385,19 +495,21 @@ export function retunedDownloadName(
   sourceA: number,
   targetA: number,
   engine: ExportEngine = "rubberband",
+  format: ExportFormat = "wav",
 ): string {
   const stem = safeFileStem(trackName);
   const s = Math.round(sourceA);
   const t = Math.round(targetA);
   const tag = engine === "rubberband" ? "TrueHz-HQ" : "preview";
-  return `${stem}_A${s}-A${t}_${tag}.wav`;
+  const ext = format === "mp3" ? "mp3" : "wav";
+  return `${stem}_A${s}-A${t}_${tag}.${ext}`;
 }
 
 /**
- * Decode blob → TrueHz Convert HQ retune → WAV download.
+ * Decode blob → TrueHz Convert HQ retune → WAV or MP3 download.
  * Optional TrueHz pure-tone bed mixed when bedOn is true.
  */
-export async function exportRetunedWav(opts: {
+export async function exportRetunedFile(opts: {
   arrayBuffer: ArrayBuffer;
   trackName: string;
   sourceA: number;
@@ -406,10 +518,13 @@ export async function exportRetunedWav(opts: {
   /** Mix TrueHz pure sine at targetA under the retuned track. */
   bedOn?: boolean;
   bedLevel?: number;
+  /** Output container after HQ retune (default WAV). */
+  format?: ExportFormat;
   onProgress?: (fraction: number, status?: string) => void;
 }): Promise<ExportResult> {
   const ctx = new AudioContext();
   const style = opts.retuneStyle ?? "concert";
+  const format: ExportFormat = opts.format === "mp3" ? "mp3" : "wav";
   try {
     opts.onProgress?.(0.02, "Decoding audio…");
     const buffer = await ctx.decodeAudioData(opts.arrayBuffer.slice(0));
@@ -432,15 +547,37 @@ export async function exportRetunedWav(opts: {
       );
     }
 
-    opts.onProgress?.(0.99, "Encoding WAV…");
-    const blob = audioBufferToWavBlob(finalBuf);
+    let blob: Blob;
+    if (format === "mp3") {
+      opts.onProgress?.(0.98, "Encoding MP3…");
+      blob = await audioBufferToMp3Blob(finalBuf, (f) => {
+        opts.onProgress?.(0.98 + f * 0.02, "Encoding MP3…");
+      });
+    } else {
+      opts.onProgress?.(0.99, "Encoding WAV…");
+      blob = audioBufferToWavBlob(finalBuf);
+    }
+
     triggerDownload(
       blob,
-      retunedDownloadName(opts.trackName, opts.sourceA, opts.targetA, engine),
+      retunedDownloadName(
+        opts.trackName,
+        opts.sourceA,
+        opts.targetA,
+        engine,
+        format,
+      ),
     );
     opts.onProgress?.(1, "Done");
-    return { engine, usedFallback };
+    return { engine, usedFallback, format };
   } finally {
     await ctx.close();
   }
+}
+
+/** @deprecated Prefer exportRetunedFile — same HQ path, WAV only. */
+export async function exportRetunedWav(
+  opts: Parameters<typeof exportRetunedFile>[0],
+): Promise<ExportResult> {
+  return exportRetunedFile({ ...opts, format: "wav" });
 }

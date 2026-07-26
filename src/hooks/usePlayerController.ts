@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PlayerEngine, type PlayMode } from "../lib/playerEngine";
 import * as db from "../lib/db";
-import { exportRetunedWav } from "../lib/exportRetune";
+import { exportRetunedFile } from "../lib/exportRetune";
 import {
   bindMediaSessionHandlers,
   updateMediaSessionMetadata,
@@ -12,6 +12,7 @@ import { buildPlayOrder, resolveNext } from "../lib/queue";
 import type { FrequencyAnchor } from "../lib/frequencies";
 import { clampPitchA } from "../lib/retune";
 import type {
+  ExportFormat,
   PlayerSettings,
   RepeatMode,
   RetuneStyle,
@@ -629,6 +630,11 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
     setRepeat(order[(i + 1) % order.length]);
   }, [settings.repeat, setRepeat]);
 
+  const setExportFormat = useCallback(
+    (exportFormat: ExportFormat) => patchSettings({ exportFormat }),
+    [patchSettings],
+  );
+
   const downloadRetuned = useCallback(async (): Promise<boolean> => {
     const id = activeIdRef.current;
     if (!id) {
@@ -637,6 +643,7 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
     }
     const track = tracks.find((t) => t.id === id);
     const s = settingsRef.current;
+    const format = s.exportFormat === "mp3" ? "mp3" : "wav";
     setExporting(true);
     setExportProgress(0);
     setExportStatus("Starting TrueHz Convert…");
@@ -646,7 +653,7 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
       const rec = await db.getTrack(id);
       if (!rec) throw new Error("Track not found in library");
       const data = await rec.blob.arrayBuffer();
-      const result = await exportRetunedWav({
+      const result = await exportRetunedFile({
         arrayBuffer: data,
         trackName: track?.name ?? rec.name,
         sourceA: s.sourceA,
@@ -654,6 +661,7 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
         retuneStyle: s.retuneStyle,
         bedOn: s.bedOn,
         bedLevel: s.bedLevel,
+        format,
         onProgress: (f, status) => {
           if (typeof f === "number" && f >= 0) setExportProgress(f);
           if (status) setExportStatus(status);
@@ -739,6 +747,7 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
     setTargetA,
     setPitchPair,
     setAutoDetectPitch,
+    setExportFormat,
     applyFrequencyAnchor,
     applyTargetHz,
     acceptPitchEstimate,

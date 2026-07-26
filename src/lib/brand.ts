@@ -36,11 +36,11 @@ export const BRAND = {
   bedLabel: "TrueHz pure-tone bed",
   /** HQ export product name (engine inside Play In 432) */
   convertProduct: "TrueHz Convert",
-  /** Download button label */
-  downloadHqLabel: "Download HQ WAV",
+  /** Download button label (format chosen separately: WAV / MP3) */
+  downloadHqLabel: "Download HQ",
   /** Download button subtitle / title */
   downloadHqTitle:
-    "TrueHz Convert · Rubber Band high-quality offline export (16-bit WAV)",
+    "TrueHz Convert · Rubber Band high-quality offline export (WAV or MP3)",
   /** Progress label while exporting */
   downloadHqProgress: "TrueHz Convert",
 } as const;

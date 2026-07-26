@@ -35,6 +35,9 @@ export type PlayMode = "original" | "retuned";
 /** How target Hz is turned into a pitch scale (see retune.ts). */
 export type RetuneStyle = "concert" | "reanchor";
 
+/** HQ export container after TrueHz Convert retune. */
+export type ExportFormat = "wav" | "mp3";
+
 export type PlayerSettings = {
   volume: number;
   mode: PlayMode;
@@ -56,6 +59,8 @@ export type PlayerSettings = {
   repeat: RepeatMode;
   /** Auto-run pitch estimate when a track loads */
   autoDetectPitch: boolean;
+  /** Download HQ as 16-bit WAV or MP3 (TrueHz Convert still retunes first). */
+  exportFormat: ExportFormat;
 };
 
 export const DEFAULT_SETTINGS: PlayerSettings = {
@@ -69,6 +74,7 @@ export const DEFAULT_SETTINGS: PlayerSettings = {
   shuffle: false,
   repeat: "off",
   autoDetectPitch: true,
+  exportFormat: "wav",
 };
 
 /** Normalize legacy settings from older builds. */
@@ -123,6 +129,10 @@ export function normalizeSettings(
       typeof r.autoDetectPitch === "boolean"
         ? r.autoDetectPitch
         : DEFAULT_SETTINGS.autoDetectPitch,
+    exportFormat:
+      r.exportFormat === "wav" || r.exportFormat === "mp3"
+        ? r.exportFormat
+        : DEFAULT_SETTINGS.exportFormat,
   };
 }
 

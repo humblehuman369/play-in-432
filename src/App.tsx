@@ -900,6 +900,26 @@ export default function App() {
                 >
                   Repeat: {player.settings.repeat}
                 </button>
+                <div className="export-format" role="group" aria-label="Download format">
+                  <button
+                    type="button"
+                    className={`chip ${player.settings.exportFormat === "wav" ? "on" : ""}`}
+                    disabled={player.exporting}
+                    onClick={() => player.setExportFormat("wav")}
+                    title="16-bit PCM WAV — highest quality TrueHz Convert file"
+                  >
+                    WAV
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip ${player.settings.exportFormat === "mp3" ? "on" : ""}`}
+                    disabled={player.exporting}
+                    onClick={() => player.setExportFormat("mp3")}
+                    title="320 kbps MP3 — smaller file, widely compatible"
+                  >
+                    MP3
+                  </button>
+                </div>
                 <button
                   type="button"
                   className="btn primary sm download-btn"
@@ -907,9 +927,9 @@ export default function App() {
                   onClick={() => void requestDownloadHq()}
                   title={
                     pro.isPro
-                      ? BRAND.downloadHqTitle
+                      ? `${BRAND.downloadHqTitle} · ${player.settings.exportFormat.toUpperCase()}`
                       : pro.exportGate.ok
-                        ? `${BRAND.downloadHqTitle} · ${pro.exportGate.remaining} free left`
+                        ? `${BRAND.downloadHqTitle} · ${player.settings.exportFormat.toUpperCase()} · ${pro.exportGate.remaining} free left`
                         : `Free limit (${FREE_HQ_EXPORT_LIMIT}) reached — TrueHz Pro`
                   }
                 >
@@ -922,7 +942,8 @@ export default function App() {
                   ) : (
                     <>
                       <Download size={14} />
-                      {BRAND.downloadHqLabel}
+                      {BRAND.downloadHqLabel}{" "}
+                      {player.settings.exportFormat.toUpperCase()}
                       {!pro.isPro && pro.exportGate.ok && (
                         <span className="export-left">
                           {pro.exportGate.remaining}
@@ -949,6 +970,7 @@ export default function App() {
                     {player.settings.bedOn
                       ? ` · + ${BRAND.bedLabel}`
                       : ""}
+                    {` · ${player.settings.exportFormat.toUpperCase()}`}
                   </p>
                 </div>
               )}
@@ -1146,7 +1168,7 @@ export default function App() {
                 <li>
                   <strong>{BRAND.downloadHqLabel}</strong> uses the{" "}
                   <strong>{BRAND.convertProduct}</strong> engine (Rubber Band)
-                  for high-quality offline WAV. Live listening stays fast
+                  for high-quality offline WAV or MP3. Live listening stays fast
                   (SoundTouch). Same ratio math either way.
                 </li>
                 <li>

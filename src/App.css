@@ -926,6 +926,12 @@ input[type="range"]:disabled {
   line-height: 1.4;
 }
 
+.export-format {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
 .download-btn {
   margin-left: 0.15rem;
 }
