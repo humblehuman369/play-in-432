@@ -3,6 +3,7 @@
  * Used only for metadata; matching happens against local library.
  * Set VITE_SPOTIFY_CLIENT_ID in .env (see .env.example).
  */
+import { APP_URL_SCHEME, isNativeApp } from "./native";
 
 const AUTH_URL = "https://accounts.spotify.com/authorize";
 const TOKEN_URL = "https://accounts.spotify.com/api/token";
@@ -16,6 +17,8 @@ const SCOPES = [
 const LS_VERIFIER = "playin432_spotify_pkce_verifier";
 const LS_STATE = "playin432_spotify_oauth_state";
 const LS_TOKENS = "playin432_spotify_tokens";
+/** Redirect URI used for the in-flight auth (must match token exchange). */
+const LS_REDIRECT = "playin432_spotify_oauth_redirect";
 
 export type SpotifyTokens = {
   access_token: string;
@@ -47,6 +50,16 @@ export function getSpotifyClientId(): string | null {
 /**
  * Spotify requires HTTPS except for loopback IPs.
  * `localhost` is NOT allowed — use 127.0.0.1 (or [::1]).
+ *
+ * Always use the **site origin root** with a trailing slash — never the
+ * current SPA path (that caused "redirect_uri: Not matching configuration"
+ * when the path did not match the Spotify Dashboard allowlist exactly).
+ *
+ * Dashboard must list every URI you use, character-for-character, e.g.:
+ *   https://playin432.com/
+ *   http://127.0.0.1:5173/
+ *   playin432://callback   (native Capacitor)
+ *
  * @see https://developer.spotify.com/documentation/web-api/concepts/redirect_uri
  */
 export function getSpotifyRedirectUri(): string {
@@ -55,15 +68,30 @@ export function getSpotifyRedirectUri(): string {
     | undefined;
   if (override?.trim()) return override.trim();
 
-  const { protocol, hostname, port, pathname } = window.location;
+  // Native shell: custom scheme (register same URI in Spotify Dashboard)
+  if (isNativeApp()) {
+    return `${APP_URL_SCHEME}://callback`;
+  }
+
+  const { protocol, hostname, port } = window.location;
   // Map localhost → 127.0.0.1 so OAuth matches Spotify's allowlist
   const host =
     hostname === "localhost" || hostname === "[::1]"
       ? "127.0.0.1"
       : hostname;
   const portPart = port ? `:${port}` : "";
-  const path = pathname || "/";
-  return `${protocol}//${host}${portPart}${path}`;
+  // Origin root only — trailing slash is intentional and must match Dashboard
+  return `${protocol}//${host}${portPart}/`;
+}
+
+/** URIs to paste into Spotify Dashboard for this product. */
+export function getSpotifyDashboardRedirectHints(): string[] {
+  return [
+    "https://playin432.com/",
+    "https://www.playin432.com/",
+    "http://127.0.0.1:5173/",
+    `${APP_URL_SCHEME}://callback`,
+  ];
 }
 
 function base64UrlEncode(buf: ArrayBuffer): string {
@@ -106,6 +134,7 @@ export function clearSpotifyTokens() {
   localStorage.removeItem(LS_TOKENS);
   localStorage.removeItem(LS_VERIFIER);
   localStorage.removeItem(LS_STATE);
+  localStorage.removeItem(LS_REDIRECT);
 }
 
 export function isSpotifyConnected(): boolean {
@@ -126,13 +155,16 @@ export async function beginSpotifyLogin(): Promise<void> {
   const state = randomString(16);
   const challenge = base64UrlEncode(await sha256(verifier));
 
+  const redirectUri = getSpotifyRedirectUri();
   localStorage.setItem(LS_VERIFIER, verifier);
   localStorage.setItem(LS_STATE, state);
+  // Token exchange must reuse the exact same redirect_uri string
+  localStorage.setItem(LS_REDIRECT, redirectUri);
 
   const params = new URLSearchParams({
     client_id: clientId,
     response_type: "code",
-    redirect_uri: getSpotifyRedirectUri(),
+    redirect_uri: redirectUri,
     scope: SCOPES,
     state,
     code_challenge_method: "S256",
@@ -204,15 +236,19 @@ export async function completeSpotifyLoginFromUrl(): Promise<boolean> {
     throw new Error("Missing PKCE verifier. Try connecting again.");
   }
 
+  const redirectUri =
+    localStorage.getItem(LS_REDIRECT) || getSpotifyRedirectUri();
+
   await exchangeToken({
     grant_type: "authorization_code",
     code,
-    redirect_uri: getSpotifyRedirectUri(),
+    redirect_uri: redirectUri,
     code_verifier: verifier,
   });
 
   localStorage.removeItem(LS_VERIFIER);
   localStorage.removeItem(LS_STATE);
+  localStorage.removeItem(LS_REDIRECT);
 
   url.searchParams.delete("code");
   url.searchParams.delete("state");

@@ -20,6 +20,8 @@ import {
   fetchPlaylistTracks,
   fetchUserPlaylists,
   getSpotifyClientId,
+  getSpotifyDashboardRedirectHints,
+  getSpotifyRedirectUri,
   isSpotifyConnected,
   spotifyTracksToQueries,
   type SpotifyPlaylistSummary,
@@ -258,8 +260,8 @@ export function PlaylistImportPanel({
 
           {!clientId ? (
             <p className="playlist-import-hint">
-              Set <code>VITE_SPOTIFY_CLIENT_ID</code> in <code>.env</code> (see{" "}
-              <code>.env.example</code>). Create an app at{" "}
+              Set <code>VITE_SPOTIFY_CLIENT_ID</code> in <code>.env</code> (and
+              Vercel env for production), then rebuild. Create an app at{" "}
               <a
                 href="https://developer.spotify.com/dashboard"
                 target="_blank"
@@ -267,25 +269,52 @@ export function PlaylistImportPanel({
               >
                 developer.spotify.com
               </a>
-              . Redirect URI must be{" "}
-              <code>http://127.0.0.1:5173/</code> (Spotify rejects{" "}
-              <code>localhost</code>). Open the app at that same URL.
+              . Add redirect URIs (exact match, trailing slash counts):
+              {getSpotifyDashboardRedirectHints().map((u) => (
+                <code key={u} className="spotify-redirect-uri">
+                  {u}
+                </code>
+              ))}
             </p>
           ) : !spotifyOk ? (
-            <button
-              type="button"
-              className="btn primary sm"
-              disabled={busy}
-              onClick={() => {
-                void beginSpotifyLogin().catch((e) =>
-                  onError?.(
-                    e instanceof Error ? e.message : "Spotify login failed",
-                  ),
-                );
-              }}
-            >
-              <Link2 size={14} /> Connect Spotify
-            </button>
+            <>
+              <button
+                type="button"
+                className="btn primary sm"
+                disabled={busy}
+                onClick={() => {
+                  void beginSpotifyLogin().catch((e) => {
+                    const msg =
+                      e instanceof Error ? e.message : "Spotify login failed";
+                    const redirect = getSpotifyRedirectUri();
+                    onError?.(
+                      /redirect/i.test(msg)
+                        ? `${msg} Add this exact Redirect URI in Spotify Dashboard → your app → Settings: ${redirect}`
+                        : msg,
+                    );
+                  });
+                }}
+              >
+                <Link2 size={14} /> Connect Spotify
+              </button>
+              <p className="playlist-import-hint">
+                This session will redirect to{" "}
+                <code className="spotify-redirect-uri">
+                  {getSpotifyRedirectUri()}
+                </code>
+                . That string must appear under{" "}
+                <strong>Redirect URIs</strong> in the{" "}
+                <a
+                  href="https://developer.spotify.com/dashboard"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Spotify Dashboard
+                </a>{" "}
+                for your client ID (copy/paste exactly — include the trailing{" "}
+                <code>/</code>).
+              </p>
+            </>
           ) : (
             <div className="spotify-connected">
               <div className="spotify-connected-actions">
