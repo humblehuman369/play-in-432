@@ -74,6 +74,15 @@ export function getSpotifyRedirectUri(): string {
   }
 
   const { protocol, hostname, port } = window.location;
+  // Production brand domain — always apex HTTPS so Dashboard needs only one URI
+  // (avoids www vs non-www and path mismatches).
+  if (
+    hostname === "playin432.com" ||
+    hostname === "www.playin432.com"
+  ) {
+    return "https://playin432.com/";
+  }
+
   // Map localhost → 127.0.0.1 so OAuth matches Spotify's allowlist
   const host =
     hostname === "localhost" || hostname === "[::1]"

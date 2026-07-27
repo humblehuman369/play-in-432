@@ -46,6 +46,7 @@ import {
   recordHqExport,
   stripCheckoutParams,
 } from "./lib/pro";
+import { completeSpotifyLoginFromUrl } from "./lib/spotify";
 import {
   PITCH_PRESETS,
   centsFromRatio,
@@ -138,10 +139,32 @@ export default function App() {
   }, []);
 
   // Stripe Checkout return (?checkout=success&session_id=…)
+  // Spotify OAuth return (?code=&state=) — must run at app root, not only on
+  // the Playlists tab (that panel is unmounted on redirect back to /).
   // Also re-runs on native deep link after external Safari checkout.
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
+      // Spotify PKCE callback first (code/state on URL)
+      try {
+        const spotifyDone = await completeSpotifyLoginFromUrl();
+        if (cancelled) return;
+        if (spotifyDone) {
+          setProToast(
+            "Spotify connected. Open Playlists to import a playlist.",
+          );
+          enterApp("playlists");
+          return;
+        }
+      } catch (e) {
+        if (!cancelled) {
+          player.setError(
+            e instanceof Error ? e.message : "Spotify login failed.",
+          );
+          enterApp("playlists");
+        }
+      }
+
       const result = await handleCheckoutReturn(window.location.search);
       if (cancelled) return;
       if (result === "activated") {

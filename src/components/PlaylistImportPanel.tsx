@@ -16,7 +16,6 @@ import {
 import {
   beginSpotifyLogin,
   clearSpotifyTokens,
-  completeSpotifyLoginFromUrl,
   fetchPlaylistTracks,
   fetchUserPlaylists,
   getSpotifyClientId,
@@ -134,33 +133,24 @@ export function PlaylistImportPanel({
     }
   }, [onError]);
 
-  // Complete OAuth redirect once
+  // OAuth code exchange runs in App root (so it works after redirect to /).
+  // Here we only hydrate UI if tokens already exist or become available.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const done = await completeSpotifyLoginFromUrl();
-        if (cancelled) return;
-        if (done) {
-          setSpotifyOk(true);
-          setStatus("Connected to Spotify. Choose a playlist to match.");
-          await loadSpotifyPlaylists();
-        } else if (isSpotifyConnected()) {
-          setSpotifyOk(true);
-          void loadSpotifyPlaylists();
-        }
-      } catch (e) {
-        if (!cancelled) {
-          onError?.(
-            e instanceof Error ? e.message : "Spotify login failed.",
-          );
-        }
+    if (isSpotifyConnected()) {
+      setSpotifyOk(true);
+      void loadSpotifyPlaylists();
+      return;
+    }
+    // After App root completes OAuth, URL is cleaned; re-check shortly
+    const t = window.setTimeout(() => {
+      if (isSpotifyConnected()) {
+        setSpotifyOk(true);
+        setStatus("Connected to Spotify. Choose a playlist to match.");
+        void loadSpotifyPlaylists();
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [loadSpotifyPlaylists, onError]);
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [loadSpotifyPlaylists]);
 
   const importSpotifyPlaylist = useCallback(
     async (pl: SpotifyPlaylistSummary) => {
