@@ -85,6 +85,15 @@ export default function App() {
     () => parseShareParams(window.location.search),
     [],
   );
+  // Gift redeem deep link: /?redeem=cs_…
+  const redeemCode = useMemo(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("redeem");
+    } catch {
+      return null;
+    }
+  }, []);
+
   if (shareParams.isShare) {
     return (
       <ShareDemoView
@@ -95,10 +104,14 @@ export default function App() {
     );
   }
 
-  return <AppMain />;
+  return <AppMain initialRedeemCode={redeemCode} />;
 }
 
-function AppMain() {
+function AppMain({
+  initialRedeemCode,
+}: {
+  initialRedeemCode?: string | null;
+}) {
   const lib = useLibrary();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -200,7 +213,7 @@ function AppMain() {
         void lib.refresh();
       } else if (typeof result === "object" && result.kind === "gift") {
         setProToast(
-          `Gift code ready (${result.tier.toUpperCase()}): ${result.code} — copy and send to the recipient. They use Restore / redeem gift.`,
+          `Gift code (${result.tier.toUpperCase()}): ${result.code} — copy & send, or we email them if they entered a recipient on Stripe. They open the link or use Restore / redeem gift.`,
         );
         stripCheckoutParams();
         enterApp("player");
@@ -224,6 +237,37 @@ function AppMain() {
       window.removeEventListener("popstate", onDeep);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount + deep links
+  }, []);
+
+  // Auto-redeem gift link ?redeem=cs_…
+  useEffect(() => {
+    if (!initialRedeemCode?.startsWith("cs_")) return;
+    let cancelled = false;
+    void (async () => {
+      const ok = await pro.restoreAccess({ code: initialRedeemCode });
+      if (cancelled) return;
+      if (ok) {
+        setProToast("Gift redeemed — access unlocked on this device.");
+        enterApp("player");
+      } else {
+        setProToast(
+          pro.checkoutError ||
+            "Could not redeem gift. Check the code under Pricing → Restore.",
+        );
+        enterApp("player");
+      }
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("redeem");
+        window.history.replaceState({}, "", url.pathname + url.search);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Returning visitors with a library skip the homepage unless they chose Home.

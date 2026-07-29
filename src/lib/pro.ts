@@ -487,8 +487,8 @@ export async function startCheckout(
   opts: CheckoutOptions = {},
 ): Promise<void> {
   const tier = opts.tier === "lite" ? "lite" : "pro";
-  // Gifts & Lite always use Stripe (IAP Lite SKU optional later)
-  if (opts.gift || tier === "lite") {
+  // Gifts always use Stripe (email redeem code)
+  if (opts.gift) {
     await startCheckoutStripe(opts);
     return;
   }
@@ -496,12 +496,16 @@ export async function startCheckout(
   const rc = await import("./revenueCat");
   if (rc.isRevenueCatNative()) {
     try {
-      const ok = await rc.purchaseDefaultPro();
-      if (!ok) throw new Error("Purchase completed but Pro was not unlocked.");
+      const ok =
+        tier === "lite"
+          ? await rc.purchaseLite()
+          : await rc.purchaseDefaultPro();
+      if (!ok) throw new Error("Purchase completed but access was not unlocked.");
       return;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (/cancel/i.test(msg)) throw e;
+      // Missing Lite package etc. → Stripe so unlock still works
       console.warn("[Pro] RevenueCat purchase failed, trying Stripe:", msg);
       await startCheckoutStripe(opts);
       return;

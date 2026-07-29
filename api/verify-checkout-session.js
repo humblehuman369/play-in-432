@@ -62,6 +62,43 @@ export default async function handler(req, res) {
 
     const tier = tierFromSession(session);
     const gift = session.metadata?.gift === "1";
+    const giftCode = gift ? session.id : undefined;
+
+    // Optional: email recipient when Resend is configured
+    let emailed = false;
+    if (gift && giftCode && process.env.RESEND_API_KEY) {
+      try {
+        const custom = session.custom_fields || [];
+        const field = custom.find((f) => f.key === "recipient_email");
+        const recipient =
+          field?.text?.value ||
+          session.metadata?.recipient_email ||
+          null;
+        if (recipient && String(recipient).includes("@")) {
+          const origin =
+            process.env.APP_URL?.replace(/\/$/, "") || "https://playin432.com";
+          const base = origin.includes("localhost")
+            ? "https://playin432.com"
+            : origin;
+          const r = await fetch(`${base}/api/send-gift-email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: recipient,
+              tier,
+              giftCode,
+              fromName:
+                session.metadata?.from_name ||
+                session.customer_details?.name ||
+                "Someone",
+            }),
+          });
+          emailed = r.ok;
+        }
+      } catch (e) {
+        console.warn("gift email skip", e);
+      }
+    }
 
     return res.status(200).json({
       paid: true,
@@ -70,8 +107,8 @@ export default async function handler(req, res) {
       currency: session.currency,
       tier,
       gift,
-      // Session id is the redeem code for gifts (share with recipient)
-      giftCode: gift ? session.id : undefined,
+      giftCode,
+      emailed,
     });
   } catch (err) {
     console.error("verify-checkout-session", err);

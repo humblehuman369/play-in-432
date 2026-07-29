@@ -16,36 +16,36 @@ Native IAP goes through **RevenueCat**. Web still uses **Stripe**.
    **OR** use Shared Secret / App Store Connect API as RevenueCat documents  
 3. Recommended: App Store Connect → Users → **In-App Purchase Key** for RevenueCat
 
-### App Store Connect products (already created)
+### App Store Connect products
 
-| Product ID | Type |
-|------------|------|
-| `com.playin432.app.truehz_pro` | Non-consumable $19.99 |
-| `com.playin432.app.truehz_pro.monthly` | Subscription $4.99/mo |
-| `com.playin432.app.truehz_pro.yearly` | Subscription $29.99/yr |
+| Product ID | Type | Entitlement |
+|------------|------|-------------|
+| `com.playin432.app.truehz_lite` | Non-consumable $9.99 | `truehz_lite` |
+| `com.playin432.app.truehz_pro` | Non-consumable $19.99 | `truehz_pro` |
+| `com.playin432.app.truehz_pro.monthly` | Subscription $4.99/mo | `truehz_pro` |
+| `com.playin432.app.truehz_pro.yearly` | Subscription $29.99/yr | `truehz_pro` |
 
 Import / attach these product IDs in RevenueCat → **Products**.
 
-## 3. Entitlement
+## 3. Entitlements
 
-Create entitlement:
+| ID | Attach |
+|----|--------|
+| `truehz_lite` | Lite non-consumable |
+| `truehz_pro` | All Pro products (lifetime + subs) |
 
-```
-truehz_pro
-```
-
-Attach **all three** products to this entitlement.
+App code: Pro entitlement implies full access; Lite unlocks frequencies + monthly HQ.
 
 ## 4. Offering
 
 1. Create offering identifier: **`default`** (or mark as Current)  
 2. Add packages:
-   - Lifetime → `com.playin432.app.truehz_pro` (package id e.g. `$rc_lifetime` or custom)
-   - Annual → yearly product
-   - Monthly → monthly product  
+   - Lite → `com.playin432.app.truehz_lite`
+   - Lifetime → `com.playin432.app.truehz_pro`
+   - Annual / Monthly → if kept  
 3. Make this offering **Current**
 
-The app prefers packages in order: **lifetime → yearly → monthly**.
+The app prefers packages in order: **lifetime → yearly → monthly → lite**.
 
 ## 5. API keys → app env
 

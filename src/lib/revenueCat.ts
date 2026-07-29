@@ -3,20 +3,26 @@
  * Web continues to use Stripe via pro.startCheckoutStripe().
  *
  * Dashboard setup: store-assets/REVENUECAT.md
- * Entitlement ID: truehz_pro
+ * Entitlements: truehz_pro (full), truehz_lite (frequencies + monthly HQ)
  * Products: see products.ts
  */
 import { Capacitor } from "@capacitor/core";
 import {
   IAP_PRODUCTS,
+  LITE_PRODUCT_IDS,
+  PRO_PRODUCT_IDS,
   type ProductKey,
 } from "./products";
-import { activatePro, isPro } from "./pro";
+import { activateTier, getTier } from "./pro";
+import type { TierId } from "./tiers";
 
-/** Must match RevenueCat dashboard entitlement identifier */
-export const RC_ENTITLEMENT_ID = "truehz_pro";
+/** Full Pro entitlement (must match RevenueCat dashboard) */
+export const RC_ENTITLEMENT_PRO = "truehz_pro";
+/** Lite entitlement */
+export const RC_ENTITLEMENT_LITE = "truehz_lite";
+/** @deprecated use RC_ENTITLEMENT_PRO */
+export const RC_ENTITLEMENT_ID = RC_ENTITLEMENT_PRO;
 
-/** Preferred offering identifier (or use current) */
 export const RC_OFFERING_ID = "default";
 
 function iosKey(): string {
@@ -67,8 +73,6 @@ export async function initRevenueCat(): Promise<boolean> {
     }
     await Purchases.configure({ apiKey });
     configured = true;
-
-    // Sync existing entitlement → local Pro flag
     await syncProFromCustomerInfo();
     return true;
   } catch (e) {
@@ -84,7 +88,7 @@ export type PackageInfo = {
   title: string;
   description: string;
   priceString: string;
-  /** Internal RC package for purchase */
+  tier: TierId;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   raw: any;
 };
@@ -94,6 +98,31 @@ function keyForProductId(productId: string): ProductKey | "unknown" {
     if (v.id === productId) return k as ProductKey;
   }
   return "unknown";
+}
+
+function tierForProductId(productId: string): TierId {
+  if (PRO_PRODUCT_IDS.has(productId as never)) return "pro";
+  if (LITE_PRODUCT_IDS.has(productId as never)) return "lite";
+  return "free";
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function tierFromCustomerInfo(customerInfo: any): TierId {
+  const active = customerInfo?.entitlements?.active || {};
+  if (active[RC_ENTITLEMENT_PRO]) return "pro";
+  if (active[RC_ENTITLEMENT_LITE]) return "lite";
+  // Fallback: scan active product identifiers
+  const productIds: string[] =
+    customerInfo?.allPurchasedProductIdentifiers ||
+    customerInfo?.activeSubscriptions ||
+    [];
+  for (const id of productIds) {
+    if (PRO_PRODUCT_IDS.has(id as never)) return "pro";
+  }
+  for (const id of productIds) {
+    if (LITE_PRODUCT_IDS.has(id as never)) return "lite";
+  }
+  return "free";
 }
 
 export async function getPackages(): Promise<PackageInfo[]> {
@@ -118,6 +147,7 @@ export async function getPackages(): Promise<PackageInfo[]> {
       title: product.title || productId,
       description: product.description || "",
       priceString: product.priceString || "",
+      tier: tierForProductId(productId),
       raw: pkg,
     };
   });
@@ -134,13 +164,14 @@ export async function purchasePackage(pkg: PackageInfo): Promise<boolean> {
 
   try {
     const result = await Purchases.purchasePackage({ aPackage: pkg.raw });
-    const active =
-      result.customerInfo?.entitlements?.active?.[RC_ENTITLEMENT_ID];
-    if (active) {
-      activatePro(`rc_${result.customerInfo.originalAppUserId || "user"}`);
+    const tier = tierFromCustomerInfo(result.customerInfo);
+    if (tier === "lite" || tier === "pro") {
+      activateTier(
+        tier,
+        `rc_${result.customerInfo.originalAppUserId || "user"}`,
+      );
       return true;
     }
-    // Some packages grant entitlement under different timing — re-check
     return await syncProFromCustomerInfo();
   } catch (e: unknown) {
     const err = e as { code?: string; message?: string; userCancelled?: boolean };
@@ -154,7 +185,7 @@ export async function purchasePackage(pkg: PackageInfo): Promise<boolean> {
   }
 }
 
-/** Prefer lifetime, then yearly, then monthly, else first package. */
+/** Prefer lifetime Pro, then yearly, monthly, then Lite. */
 export async function purchaseDefaultPro(): Promise<boolean> {
   const packages = await getPackages();
   if (!packages.length) {
@@ -166,7 +197,19 @@ export async function purchaseDefaultPro(): Promise<boolean> {
     packages.find((p) => p.key === "lifetime") ||
     packages.find((p) => p.key === "yearly") ||
     packages.find((p) => p.key === "monthly") ||
+    packages.find((p) => p.key === "lite") ||
     packages[0];
+  return purchasePackage(pick);
+}
+
+export async function purchaseLite(): Promise<boolean> {
+  const packages = await getPackages();
+  const pick = packages.find((p) => p.key === "lite");
+  if (!pick) {
+    throw new Error(
+      "Lite package not found. Add com.playin432.app.truehz_lite to RevenueCat offerings.",
+    );
+  }
   return purchasePackage(pick);
 }
 
@@ -176,28 +219,28 @@ export async function restorePurchases(): Promise<boolean> {
   }
   const { Purchases } = await import("@revenuecat/purchases-capacitor");
   const { customerInfo } = await Purchases.restorePurchases();
-  const active = customerInfo?.entitlements?.active?.[RC_ENTITLEMENT_ID];
-  if (active) {
-    activatePro(`rc_restore_${customerInfo.originalAppUserId || "user"}`);
+  const tier = tierFromCustomerInfo(customerInfo);
+  if (tier === "lite" || tier === "pro") {
+    activateTier(tier, `rc_restore_${customerInfo.originalAppUserId || "user"}`);
     return true;
   }
   return false;
 }
 
 export async function syncProFromCustomerInfo(): Promise<boolean> {
-  if (!isRevenueCatNative()) return isPro();
-  if (!configured && !(await initRevenueCat())) return isPro();
+  if (!isRevenueCatNative()) return getTier() !== "free";
+  if (!configured && !(await initRevenueCat())) return getTier() !== "free";
 
   try {
     const { Purchases } = await import("@revenuecat/purchases-capacitor");
     const { customerInfo } = await Purchases.getCustomerInfo();
-    const active = customerInfo?.entitlements?.active?.[RC_ENTITLEMENT_ID];
-    if (active) {
-      activatePro(`rc_${customerInfo.originalAppUserId || "user"}`);
+    const tier = tierFromCustomerInfo(customerInfo);
+    if (tier === "lite" || tier === "pro") {
+      activateTier(tier, `rc_${customerInfo.originalAppUserId || "user"}`);
       return true;
     }
   } catch (e) {
     console.warn("[RevenueCat] getCustomerInfo", e);
   }
-  return isPro();
+  return getTier() !== "free";
 }

@@ -1,47 +1,45 @@
-# In-App Purchases & Subscriptions — Play In 432
+# In-App Purchases — Play In 432
 
-Configured in App Store Connect via API (2026-07-20).
+## Products (create in App Store Connect if missing)
 
-## Products
+| Type | Product ID | Price (USA) | Tier |
+|------|------------|-------------|------|
+| **Non-Consumable** Lite | `com.playin432.app.truehz_lite` | **$9.99** | Lite |
+| **Non-Consumable** Pro lifetime | `com.playin432.app.truehz_pro` | **$19.99** | Pro |
+| Auto-renewable monthly | `com.playin432.app.truehz_pro.monthly` | **$4.99**/mo | Pro |
+| Auto-renewable yearly | `com.playin432.app.truehz_pro.yearly` | **$29.99**/yr | Pro |
 
-| Type | Product ID | Price (USA) | ASC State |
-|------|------------|-------------|-----------|
-| **Non-Consumable** (lifetime) | `com.playin432.app.truehz_pro` | **$19.99** | READY_TO_SUBMIT |
-| **Auto-renewable** monthly | `com.playin432.app.truehz_pro.monthly` | **$4.99**/mo | MISSING_METADATA* |
-| **Auto-renewable** yearly | `com.playin432.app.truehz_pro.yearly` | **$29.99**/yr | MISSING_METADATA* |
+## Create Lite in App Store Connect
 
-\*Subscriptions may still show MISSING_METADATA until all territories/pricing fully process; localizations + USA prices + availability were set.
+1. App → **Monetization → In-App Purchases** → **+**  
+2. Type: **Non-Consumable**  
+3. Reference name: `TrueHz Lite`  
+4. Product ID: `com.playin432.app.truehz_lite` (exact)  
+5. Price: **$9.99** (USA)  
+6. Localization: display name **TrueHz Lite**, description matching web  
+7. Submit with next app version (or after 1.0 is live as an IAP update)
 
-**Subscription group:** TrueHz Membership  
+## RevenueCat
 
-## What unlocks (same Pro entitlements)
+1. **Products** → import / add `com.playin432.app.truehz_lite`  
+2. **Entitlements**:
+   - `truehz_lite` → attach Lite product  
+   - `truehz_pro` → attach all Pro products  
+3. **Offering** `default`: packages for lite + lifetime (+ monthly/yearly if kept)  
+4. Wire **In-App Purchase .p8** on the iOS app (bundle `com.playin432.app`)
 
-- All Solfeggio / custom frequency targets  
-- Unlimited TrueHz Convert HQ WAV exports  
+## Web (Stripe)
 
-## Important Apple rules
+| Tier | Env (optional fixed Price) | Fallback |
+|------|----------------------------|----------|
+| Pro | `STRIPE_PRICE_ID` | $19.00 `price_data` |
+| Lite | `STRIPE_LITE_PRICE_ID` | $9.99 `price_data` |
 
-1. **First non-consumable** must be submitted **with an app version** (not alone).  
-   When you submit version 1.0 for review, **include** “TrueHz Pro” lifetime IAP.
-2. **Paid Apps Agreement** + banking/tax must be Active in  
-   App Store Connect → **Business** / **Agreements, Tax, and Banking**.
-3. Sandbox testing: create a Sandbox Apple ID under Users and Access → Sandbox.
-4. Web (playin432.com) still uses **Stripe** for non-iOS purchases.  
-   On iOS, use **StoreKit / IAP** (required for digital unlocks in-app).
+## Gift email (optional)
 
-## App code
+| Env | Purpose |
+|-----|---------|
+| `RESEND_API_KEY` | Send gift redeem emails |
+| `GIFT_FROM_EMAIL` | e.g. `Play In 432 <gifts@yourdomain.com>` |
 
-Product IDs live in `src/lib/products.ts`.
-
-## Submit with app version
-
-App Store Connect → Play In 432 → version 1.0 →  
-**In-App Purchases and Subscriptions** → add:
-
-- TrueHz Pro (`com.playin432.app.truehz_pro`)
-
-Then Submit for Review.
-
-## Optional cleanup
-
-If you only want **lifetime** (recommended brand story), you can leave monthly/yearly in ASC as “ready later” or remove them in the console. Lifetime alone matches “$19 one-time.”
+Gifter can also copy the `cs_…` code from the success toast without email.

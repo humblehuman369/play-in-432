@@ -9,7 +9,7 @@ Chrome / Brave / Edge **Manifest V3** scaffold for real-time tab audio retune.
 | Popup UI (source/target, disclaimer) | Done |
 | Free 440→432 gating hook | Done |
 | Tab capture + offscreen document | Wired |
-| High-quality live pitch (SoundTouch/Worklet) | **TODO Phase 4.2** |
+| Live pitch (SoundTouch, tempo preserved) | Done (ScriptProcessor path) |
 | Chrome Web Store listing assets | TODO |
 
 ## Load unpacked (dev)
@@ -28,7 +28,7 @@ The popup states that this shifts **browser audio output** by a ratio and does *
 
 ## Next engineering steps
 
-1. Port SoundTouch or a WASM pitch shifter into `offscreen.js` as an AudioWorklet.  
-2. Preserve tempo (pitch without rate change).  
-3. Measure latency on Spotify Web / YouTube.  
-4. Package icons (128/48/16) and store listing.
+1. Migrate ScriptProcessor → AudioWorklet for lower latency / future-proofing.  
+2. Measure latency on Spotify Web / YouTube; document DRM failures.  
+3. Bridge Lite/Pro unlock from playin432.com → `chrome.storage.local.proUnlocked`.  
+4. Package icons (128/48/16) and Chrome Web Store listing.

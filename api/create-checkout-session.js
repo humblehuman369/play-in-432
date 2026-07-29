@@ -142,7 +142,24 @@ export default async function handler(req, res) {
         tier,
         gift: gift ? "1" : "0",
         app: "play-in-432",
+        ...(body.recipientEmail
+          ? { recipient_email: String(body.recipientEmail).trim().toLowerCase() }
+          : {}),
+        ...(body.fromName
+          ? { from_name: String(body.fromName).trim().slice(0, 80) }
+          : {}),
       },
+      // Collect gifter email always; recipient may be in custom field
+      custom_fields: gift
+        ? [
+            {
+              key: "recipient_email",
+              label: { type: "custom", custom: "Recipient email (optional)" },
+              type: "text",
+              optional: true,
+            },
+          ]
+        : undefined,
     });
 
     return res.status(200).json({ url: session.url, id: session.id, tier, gift });
