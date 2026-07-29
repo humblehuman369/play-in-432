@@ -24,13 +24,14 @@ type Props = {
   /** Apply a target concert A and open the player */
   onPickFrequency?: (hz: number) => void;
   onOpenLearn?: () => void;
-  onUpgrade?: () => void;
+  onUpgrade?: (opts?: { tier?: "lite" | "pro"; gift?: boolean }) => void;
   onRestore?: () => void;
   onRestoreAccess?: (input: {
     email?: string;
     sessionId?: string;
   }) => Promise<boolean>;
   isPro?: boolean;
+  tier?: "free" | "lite" | "pro";
   checkoutBusy?: boolean;
   checkoutError?: string | null;
   nativeBilling?: boolean;
@@ -123,6 +124,7 @@ export function LandingView({
   onRestore,
   onRestoreAccess,
   isPro,
+  tier = "free",
   checkoutBusy,
   checkoutError,
   nativeBilling,
@@ -441,6 +443,7 @@ export function LandingView({
       {/* PRICING */}
       {onUpgrade && (
         <PricingSection
+          tier={tier}
           isPro={Boolean(isPro)}
           checkoutBusy={checkoutBusy}
           checkoutError={checkoutError}

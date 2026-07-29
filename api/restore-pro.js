@@ -1,8 +1,8 @@
 /**
- * Restore TrueHz Pro after reinstall / new browser / app origin change.
+ * Restore TrueHz Lite/Pro after reinstall / new browser / gift redeem.
  *
  * Body:
- *   { sessionId: "cs_live_…" }  — from Stripe success URL / receipt
+ *   { sessionId: "cs_live_…" }  — Stripe session or gift code
  *   { email: "you@example.com" } — email used at Stripe Checkout
  *
  * Env: STRIPE_SECRET_KEY
@@ -15,20 +15,24 @@ function setCors(res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
+function tierFromSession(session) {
+  const meta = session.metadata || {};
+  if (meta.tier === "lite" || meta.product === "truehz_lite") return "lite";
+  if (meta.tier === "pro" || meta.product === "truehz_pro") return "pro";
+  const amount = session.amount_total ?? 0;
+  if (amount > 0 && amount < 1500) return "lite";
+  if (amount >= 1900 && amount <= 3500) return "pro";
+  // Accept known product metadata app tag
+  if (meta.app === "play-in-432") return "pro";
+  return null;
+}
+
 function isPaidSession(session) {
   if (!session) return false;
   const paid =
     session.payment_status === "paid" || session.status === "complete";
   if (!paid) return false;
-  // Prefer our metadata; also accept $19 Pro amount
-  if (session.metadata?.product === "truehz_pro") return true;
-  if (session.metadata?.app === "play-in-432") return true;
-  const amount = session.amount_total ?? 0;
-  // $19.00 one-time (allow small variance for tax-inclusive locales)
-  if (amount >= 1900 && amount <= 2500 && session.mode === "payment") {
-    return true;
-  }
-  return false;
+  return tierFromSession(session) != null;
 }
 
 function emailOf(session) {
@@ -52,7 +56,10 @@ async function findByEmail(stripe, rawEmail) {
     .toLowerCase();
   if (!email || !email.includes("@")) return null;
 
-  // 1) Known Stripe customers with this email
+  let best = null;
+  let bestRank = -1;
+  const rank = (t) => (t === "pro" ? 2 : t === "lite" ? 1 : 0);
+
   const customers = await stripe.customers.list({ email, limit: 10 });
   for (const customer of customers.data) {
     const sessions = await stripe.checkout.sessions.list({
@@ -60,12 +67,16 @@ async function findByEmail(stripe, rawEmail) {
       limit: 30,
     });
     for (const s of sessions.data) {
-      if (isPaidSession(s)) return s;
+      if (!isPaidSession(s)) continue;
+      const t = tierFromSession(s);
+      const r = rank(t);
+      if (r > bestRank) {
+        best = s;
+        bestRank = r;
+      }
     }
   }
 
-  // 2) Guest checkouts — scan recent complete sessions (bounded)
-  // Stripe list is newest-first.
   let starting_after;
   for (let page = 0; page < 5; page++) {
     const list = await stripe.checkout.sessions.list({
@@ -77,14 +88,19 @@ async function findByEmail(stripe, rawEmail) {
     for (const s of list.data) {
       const em = emailOf(s);
       if (em && em.toLowerCase() === email && isPaidSession(s)) {
-        return s;
+        const t = tierFromSession(s);
+        const r = rank(t);
+        if (r > bestRank) {
+          best = s;
+          bestRank = r;
+        }
       }
     }
     if (!list.has_more) break;
     starting_after = list.data[list.data.length - 1].id;
   }
 
-  return null;
+  return best;
 }
 
 export default async function handler(req, res) {
@@ -105,12 +121,13 @@ export default async function handler(req, res) {
   try {
     const body =
       typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
-    const sessionId = (body.sessionId || body.session_id || "").trim();
+    const sessionId = (body.sessionId || body.session_id || body.code || "").trim();
     const email = (body.email || "").trim();
 
     if (!sessionId && !email) {
       return res.status(400).json({
-        error: "Enter the email you used at checkout, or a Stripe session id (cs_…).",
+        error:
+          "Enter the email you used at checkout, or a gift/session code (cs_…).",
       });
     }
 
@@ -122,7 +139,7 @@ export default async function handler(req, res) {
       if (!session) {
         return res.status(404).json({
           paid: false,
-          error: "No paid TrueHz Pro session found for that id.",
+          error: "No paid Lite/Pro session found for that code.",
         });
       }
     } else {
@@ -131,14 +148,17 @@ export default async function handler(req, res) {
         return res.status(404).json({
           paid: false,
           error:
-            "No paid TrueHz Pro purchase found for that email. Use the same email as your Stripe receipt, or contact support.",
+            "No paid purchase found for that email. Use the same email as your Stripe receipt.",
         });
       }
     }
 
+    const tier = tierFromSession(session) || "pro";
+
     return res.status(200).json({
       paid: true,
       sessionId: session.id,
+      tier,
       email: emailOf(session),
       amount_total: session.amount_total,
       currency: session.currency,

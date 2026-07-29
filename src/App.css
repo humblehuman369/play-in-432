@@ -3155,6 +3155,281 @@ input[type="range"]:disabled {
   opacity: 0.7;
 }
 
+/* Phase 1 — three-tier pricing */
+.pricing-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.pricing-card.is-current {
+  outline: 1px solid rgba(0, 212, 170, 0.45);
+}
+
+.pricing-badge.soft {
+  background: rgba(0, 212, 170, 0.12);
+  color: #7ddec8;
+}
+
+.pricing-gift-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  margin: 1.25rem 0 0.75rem;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 20, 24, 0.85);
+}
+
+.pricing-gift-copy {
+  flex: 1 1 200px;
+}
+
+.pricing-gift-copy p {
+  margin: 0.25rem 0 0;
+  color: var(--muted, #8aa8a0);
+  font-size: 0.9rem;
+}
+
+.pricing-gift-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.pricing-gift-actions select {
+  background: #0a1218;
+  color: #e8f7f3;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0.4rem 0.55rem;
+}
+
+.pricing-restore-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.pricing-restore-panel {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 0.65rem;
+}
+
+.pricing-restore-panel label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: #8aa8a0;
+}
+
+.pricing-restore-panel input {
+  background: #0a1218;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #e8f7f3;
+  padding: 0.5rem 0.65rem;
+}
+
+.pricing-restore-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pricing-restore-msg {
+  color: #00d4aa;
+  margin: 0;
+}
+
+.pricing-footnote {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: #6a8a82;
+}
+
+/* Phase 2 — batch export */
+.batch-panel {
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 16, 20, 0.9);
+}
+
+.batch-panel.batch-locked {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.batch-header h3 {
+  margin: 0 0 0.25rem;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 1rem;
+}
+
+.batch-header p {
+  margin: 0 0 0.75rem;
+  color: #8aa8a0;
+  font-size: 0.88rem;
+}
+
+.batch-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.batch-add label.btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.batch-add label.btn select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.batch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.batch-item {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.batch-item-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+}
+
+.batch-status {
+  color: #8aa8a0;
+  font-size: 0.8rem;
+}
+
+.batch-item.status-error .batch-status {
+  color: #f0a0a0;
+}
+
+.batch-item-actions {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: flex-end;
+}
+
+.batch-empty {
+  color: #6a8a82;
+  font-size: 0.88rem;
+  padding: 0.5rem 0;
+}
+
+.batch-overall {
+  margin-bottom: 0.65rem;
+}
+
+/* Phase 3 — share demo */
+.share-demo {
+  max-width: 36rem;
+  margin: 0 auto;
+  padding: 1rem 0 2rem;
+}
+
+.share-demo-embed {
+  min-height: 100vh;
+  padding: 2rem 1.25rem 3rem;
+  background: #070b0f;
+  color: #e8f7f3;
+}
+
+.share-embed-header h1 {
+  margin: 0.25rem 0;
+  font-size: 1.6rem;
+}
+
+.share-kicker {
+  color: #00d4aa;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+}
+
+.share-lead {
+  color: #8aa8a0;
+}
+
+.share-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.share-controls label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: #8aa8a0;
+}
+
+.share-controls select {
+  background: #0f161c;
+  color: #e8f7f3;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+.share-ab {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.share-link-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.share-note {
+  margin-top: 1.25rem;
+  font-size: 0.82rem;
+  color: #6a8a82;
+}
+
+.share-note a {
+  color: #00d4aa;
+}
+
 .spotify-redirect-uri {
   display: block;
   margin: 0.35rem 0;

@@ -25,6 +25,7 @@
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.3",
     "@revenuecat/purchases-capacitor": "^13.2.3",
+    "fflate": "^0.8.3",
     "lucide-react": "^1.25.0",
     "music-metadata": "^11.14.0",
     "react": "^19.2.7",

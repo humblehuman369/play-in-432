@@ -1,16 +1,28 @@
 /**
- * Vercel Serverless — create Stripe Checkout Session (one-time TrueHz Pro).
- * Env: STRIPE_SECRET_KEY (required), STRIPE_PRICE_ID (optional),
+ * Vercel Serverless — create Stripe Checkout Session (Lite / Pro, optional gift).
+ * Env: STRIPE_SECRET_KEY (required)
+ *      STRIPE_PRICE_ID (optional Pro fixed price)
+ *      STRIPE_LITE_PRICE_ID (optional Lite fixed price)
  *      APP_URL (optional production origin override)
- *
- * CORS: required for Capacitor WebView (origin https://localhost) and local dev.
  */
 import Stripe from "stripe";
 
-const PRICE_CENTS = 1900;
-const PRODUCT_NAME = "Play In 432 — TrueHz Pro";
-const PRODUCT_DESC =
-  "Lifetime unlock: all frequency targets + unlimited TrueHz Convert HQ WAV export. One-time payment.";
+const TIERS = {
+  pro: {
+    cents: 1900,
+    name: "Play In 432 — TrueHz Pro",
+    desc: "Lifetime unlock: all frequency targets + unlimited TrueHz Convert HQ export + batch export. One-time payment.",
+    product: "truehz_pro",
+    envPrice: "STRIPE_PRICE_ID",
+  },
+  lite: {
+    cents: 999,
+    name: "Play In 432 — TrueHz Lite",
+    desc: "One-time unlock: all Solfeggio & custom targets + 10 HQ exports per month.",
+    product: "truehz_lite",
+    envPrice: "STRIPE_LITE_PRICE_ID",
+  },
+};
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -19,8 +31,6 @@ function setCors(res) {
 }
 
 function originFromReq(req) {
-  // Prefer explicit production app URL for success/cancel redirects
-  // (Capacitor origin is localhost — never use that for Stripe return URLs)
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
   const proto = req.headers["x-forwarded-proto"] || "https";
   const host = req.headers["x-forwarded-host"] || req.headers.host;
@@ -54,12 +64,16 @@ export default async function handler(req, res) {
     const body =
       typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
 
+    const tier = body.tier === "lite" ? "lite" : "pro";
+    const gift = Boolean(body.gift);
+    const cfg = TIERS[tier];
+
     const origin = originFromReq(req);
-    const successPath = body.successPath || "/?checkout=success";
+    const successPath =
+      body.successPath ||
+      (gift ? "/?checkout=success&gift=1" : "/?checkout=success");
     const cancelPath = body.cancelPath || "/?checkout=cancel";
 
-    // Native apps pass playin432:// deep links so WebView never leaves local origin
-    // (navigating WebView to Stripe/playin432.com wipes IndexedDB library).
     const allowUrl = (u) => {
       if (typeof u !== "string" || !u.trim()) return false;
       try {
@@ -88,7 +102,6 @@ export default async function handler(req, res) {
       ? String(body.cancelUrl).trim()
       : `${origin}${cancelPath}`;
 
-    // Ensure Stripe template token is present for success
     if (
       !success_url.includes("{CHECKOUT_SESSION_ID}") &&
       !success_url.includes("session_id=")
@@ -98,18 +111,19 @@ export default async function handler(req, res) {
         "session_id={CHECKOUT_SESSION_ID}";
     }
 
-    const priceId = process.env.STRIPE_PRICE_ID?.trim();
-
+    const priceId = process.env[cfg.envPrice]?.trim();
     const line_items = priceId
       ? [{ price: priceId, quantity: 1 }]
       : [
           {
             price_data: {
               currency: "usd",
-              unit_amount: PRICE_CENTS,
+              unit_amount: cfg.cents,
               product_data: {
-                name: PRODUCT_NAME,
-                description: PRODUCT_DESC,
+                name: gift ? `${cfg.name} (Gift)` : cfg.name,
+                description: gift
+                  ? `${cfg.desc} Gift purchase — recipient redeems with the session code.`
+                  : cfg.desc,
               },
             },
             quantity: 1,
@@ -124,12 +138,14 @@ export default async function handler(req, res) {
       allow_promotion_codes: true,
       billing_address_collection: "auto",
       metadata: {
-        product: "truehz_pro",
+        product: cfg.product,
+        tier,
+        gift: gift ? "1" : "0",
         app: "play-in-432",
       },
     });
 
-    return res.status(200).json({ url: session.url, id: session.id });
+    return res.status(200).json({ url: session.url, id: session.id, tier, gift });
   } catch (err) {
     console.error("create-checkout-session", err);
     return res.status(500).json({

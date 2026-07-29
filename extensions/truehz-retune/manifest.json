@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Play In 432 — TrueHz Retune",
+  "version": "0.1.0",
+  "description": "Pitch-shift your browser tab audio by a TrueHz ratio (e.g. A=440→432). Does not modify streaming masters.",
+  "permissions": ["tabCapture", "offscreen", "storage", "activeTab"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_title": "TrueHz Retune",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "icons": {
+    "128": "icons/icon-128.png"
+  }
+}

@@ -1,46 +1,33 @@
 import { useState } from "react";
-import { Check, Crown, Loader2, Sparkles, X } from "lucide-react";
+import { Check, Crown, Gift, Loader2, Sparkles, X } from "lucide-react";
 import {
-  FREE_HQ_EXPORT_LIMIT,
+  FREE_FEATURES,
+  LITE_FEATURES,
+  LITE_PRICE_LABEL,
+  PRO_FEATURES,
   PRO_PRICE_LABEL,
-  PRO_PRICE_USD,
+  type TierId,
 } from "../lib/pro";
 import { BRAND } from "../lib/brand";
 
 type Props = {
+  tier: TierId;
   isPro: boolean;
   checkoutBusy?: boolean;
   checkoutError?: string | null;
-  onUpgrade: () => void;
-  /** App Store restore (optional) */
+  onUpgrade: (opts?: { tier?: "lite" | "pro"; gift?: boolean }) => void;
   onRestore?: () => void;
-  /** Stripe email / session restore — preferred for card buyers */
   onRestoreAccess?: (input: {
     email?: string;
     sessionId?: string;
+    code?: string;
   }) => Promise<boolean>;
-  /** Native app uses RevenueCat / StoreKit */
   nativeBilling?: boolean;
   compact?: boolean;
 };
 
-const FREE_FEATURES = [
-  "Unlimited live retune · A=440 → A=432",
-  "Library, playlists, Learn",
-  "Spotify playlist match (metadata only)",
-  `${FREE_HQ_EXPORT_LIMIT} TrueHz Convert HQ exports`,
-  "TrueHz pure-tone bed",
-] as const;
-
-const PRO_FEATURES = [
-  "Everything in Free",
-  "All Solfeggio & custom targets",
-  "Unlimited TrueHz Convert HQ WAV",
-  "One-time unlock — no subscription",
-  "Restore on any device with your purchase email",
-] as const;
-
 export function PricingSection({
+  tier,
   isPro,
   checkoutBusy,
   checkoutError,
@@ -52,8 +39,9 @@ export function PricingSection({
 }: Props) {
   const [showRestore, setShowRestore] = useState(false);
   const [restoreEmail, setRestoreEmail] = useState("");
-  const [restoreSession, setRestoreSession] = useState("");
+  const [restoreCode, setRestoreCode] = useState("");
   const [localMsg, setLocalMsg] = useState<string | null>(null);
+  const [giftTier, setGiftTier] = useState<"lite" | "pro">("pro");
 
   const submitRestore = async () => {
     setLocalMsg(null);
@@ -62,21 +50,22 @@ export function PricingSection({
       return;
     }
     const email = restoreEmail.trim();
-    const sessionId = restoreSession.trim();
-    if (!email && !sessionId && nativeBilling && onRestore) {
+    const code = restoreCode.trim();
+    if (!email && !code && nativeBilling && onRestore) {
       onRestore();
       return;
     }
-    if (!email && !sessionId) {
-      setLocalMsg("Enter the email from your Stripe receipt.");
+    if (!email && !code) {
+      setLocalMsg("Enter your Stripe receipt email or a gift/session code.");
       return;
     }
     const ok = await onRestoreAccess({
       email: email || undefined,
-      sessionId: sessionId || undefined,
+      sessionId: code || undefined,
+      code: code || undefined,
     });
     if (ok) {
-      setLocalMsg("TrueHz Pro restored on this device.");
+      setLocalMsg("Access restored on this device.");
       setShowRestore(false);
     }
   };
@@ -89,158 +78,219 @@ export function PricingSection({
       {!compact && (
         <>
           <p className="landing-section-kicker">Pricing</p>
-          <h2 className="landing-h2">Free to listen. Pro to go further.</h2>
+          <h2 className="landing-h2">Free to listen. Upgrade when you need more.</h2>
           <p className="landing-section-lead">
             Keep the aha free forever — drop a track, hear{" "}
-            <span className="gold-hz">432</span>. Unlock every target and
-            unlimited {BRAND.convertProduct} when you’re ready.
+            <span className="gold-hz">432</span>. Unlock every target with Lite
+            or unlimited {BRAND.convertProduct} with Pro. No account required.
           </p>
         </>
       )}
 
-      {isPro ? (
-        <div className="pricing-pro-active">
-          <Crown size={20} />
-          <div>
-            <strong>TrueHz Pro is active on this device</strong>
-            <p>All frequencies + unlimited HQ export. Thank you.</p>
-          </div>
+      <div className="pricing-grid pricing-grid-3">
+        {/* Free */}
+        <div className="pricing-card">
+          <h3>Free forever</h3>
+          <p className="pricing-price">
+            $0 <span>always</span>
+          </p>
+          <ul className="pricing-features">
+            {FREE_FEATURES.map((f) => (
+              <li key={f}>
+                <Check size={14} /> {f}
+              </li>
+            ))}
+          </ul>
         </div>
-      ) : (
-        <div className="pricing-grid">
-          <article className="pricing-card">
-            <h3>Free forever</h3>
-            <p className="pricing-price">
-              $0 <span>always</span>
-            </p>
-            <ul>
-              {FREE_FEATURES.map((f) => (
-                <li key={f}>
-                  <Check size={14} /> {f}
-                </li>
-              ))}
-            </ul>
-          </article>
 
-          <article className="pricing-card pro">
-            <div className="pricing-badge">
-              <Sparkles size={12} /> Best value
-            </div>
-            <h3>TrueHz Pro</h3>
-            <p className="pricing-price">
-              {PRO_PRICE_LABEL}{" "}
-              <span>one-time · ${PRO_PRICE_USD}</span>
+        {/* Lite */}
+        <div className={`pricing-card ${tier === "lite" ? "is-current" : ""}`}>
+          <div className="pricing-badge soft">Most popular step</div>
+          <h3>TrueHz Lite</h3>
+          <p className="pricing-price">
+            {LITE_PRICE_LABEL} <span>one-time</span>
+          </p>
+          <ul className="pricing-features">
+            {LITE_FEATURES.map((f) => (
+              <li key={f}>
+                <Check size={14} /> {f}
+              </li>
+            ))}
+          </ul>
+          {tier === "lite" || isPro ? (
+            <p className="pricing-owned">
+              <Sparkles size={14} /> {isPro ? "Included in Pro" : "Lite active"}
             </p>
-            <ul>
-              {PRO_FEATURES.map((f) => (
-                <li key={f}>
-                  <Check size={14} /> {f}
-                </li>
-              ))}
-            </ul>
+          ) : (
             <button
               type="button"
-              className="btn primary lg pricing-cta"
-              onClick={onUpgrade}
+              className="btn primary pricing-cta"
               disabled={checkoutBusy}
+              onClick={() => onUpgrade({ tier: "lite" })}
             >
               {checkoutBusy ? (
-                <>
-                  <Loader2 size={18} className="spin" />{" "}
-                  {nativeBilling ? "Purchasing…" : "Opening checkout…"}
-                </>
+                <Loader2 size={16} className="spin" />
               ) : (
-                <>
-                  <Crown size={18} /> Unlock Pro — {PRO_PRICE_LABEL}
-                </>
+                <Sparkles size={16} />
               )}
+              Unlock Lite — {LITE_PRICE_LABEL}
             </button>
+          )}
+        </div>
 
+        {/* Pro */}
+        <div
+          className={`pricing-card pricing-card-pro ${isPro ? "is-current" : ""}`}
+        >
+          <div className="pricing-badge">Best value</div>
+          <h3>
+            <Crown size={18} /> TrueHz Pro
+          </h3>
+          <p className="pricing-price">
+            {PRO_PRICE_LABEL} <span>one-time · {PRO_PRICE_LABEL}</span>
+          </p>
+          <ul className="pricing-features">
+            {PRO_FEATURES.map((f) => (
+              <li key={f}>
+                <Check size={14} /> {f}
+              </li>
+            ))}
+          </ul>
+          {isPro ? (
+            <p className="pricing-owned">
+              <Crown size={14} /> Pro active on this device
+            </p>
+          ) : (
             <button
               type="button"
-              className="btn ghost sm pricing-restore"
-              onClick={() => {
-                setShowRestore((v) => !v);
-                setLocalMsg(null);
-              }}
+              className="btn primary pricing-cta"
               disabled={checkoutBusy}
+              onClick={() => onUpgrade({ tier: "pro" })}
             >
-              Already paid? Restore Pro
+              {checkoutBusy ? (
+                <Loader2 size={16} className="spin" />
+              ) : (
+                <Crown size={16} />
+              )}
+              Unlock Pro — {PRO_PRICE_LABEL}
             </button>
+          )}
+        </div>
+      </div>
 
-            {showRestore && (
-              <div className="pricing-restore-form">
-                <p className="pricing-restore-lead">
-                  There is no password login — Pro is unlocked on this device
-                  when we verify your purchase. Use the{" "}
-                  <strong>email on your Stripe receipt</strong>
-                  {nativeBilling ? ", or restore App Store purchases" : ""}.
-                </p>
-                <label className="pricing-field">
-                  <span>Receipt email</span>
-                  <input
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    value={restoreEmail}
-                    onChange={(e) => setRestoreEmail(e.target.value)}
-                    disabled={checkoutBusy}
-                  />
-                </label>
-                <label className="pricing-field">
-                  <span>Or session id (optional)</span>
-                  <input
-                    type="text"
-                    autoComplete="off"
-                    placeholder="cs_live_…"
-                    value={restoreSession}
-                    onChange={(e) => setRestoreSession(e.target.value)}
-                    disabled={checkoutBusy}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="btn primary sm"
-                  onClick={() => void submitRestore()}
-                  disabled={checkoutBusy}
-                >
-                  {checkoutBusy ? (
-                    <>
-                      <Loader2 size={16} className="spin" /> Restoring…
-                    </>
-                  ) : (
-                    "Restore Pro"
-                  )}
-                </button>
-                {nativeBilling && onRestore && (
-                  <button
-                    type="button"
-                    className="btn ghost sm"
-                    onClick={onRestore}
-                    disabled={checkoutBusy}
-                  >
-                    Restore App Store / Play
-                  </button>
-                )}
-              </div>
-            )}
+      {/* Gift */}
+      <div className="pricing-gift-row">
+        <Gift size={18} />
+        <div className="pricing-gift-copy">
+          <strong>Buy as a gift</strong>
+          <p>
+            Purchase Lite or Pro for someone else. You’ll get a redeem code to
+            share — they activate it here with no account.
+          </p>
+        </div>
+        <div className="pricing-gift-actions">
+          <select
+            value={giftTier}
+            onChange={(e) => setGiftTier(e.target.value as "lite" | "pro")}
+            aria-label="Gift tier"
+          >
+            <option value="lite">Lite {LITE_PRICE_LABEL}</option>
+            <option value="pro">Pro {PRO_PRICE_LABEL}</option>
+          </select>
+          <button
+            type="button"
+            className="btn sm"
+            disabled={checkoutBusy}
+            onClick={() => onUpgrade({ tier: giftTier, gift: true })}
+          >
+            <Gift size={14} /> Buy gift
+          </button>
+        </div>
+      </div>
 
-            {(checkoutError || localMsg) && (
-              <p
-                className={`pricing-error ${localMsg && !checkoutError ? "ok" : ""}`}
-                role="alert"
-              >
-                {checkoutError ? <X size={14} /> : null}{" "}
-                {checkoutError || localMsg}
-              </p>
-            )}
-            <p className="pricing-fine">
-              No account or password. Pro stays on this device after restore.
-              Keep your Stripe receipt email for new phones / reinstalls.
-            </p>
-          </article>
+      <div className="pricing-restore-row">
+        <button
+          type="button"
+          className="btn ghost sm"
+          onClick={() => setShowRestore((v) => !v)}
+        >
+          Restore purchase / redeem gift
+        </button>
+        {nativeBilling && onRestore && (
+          <button
+            type="button"
+            className="btn ghost sm"
+            disabled={checkoutBusy}
+            onClick={() => void onRestore()}
+          >
+            Restore App Store purchase
+          </button>
+        )}
+      </div>
+
+      {showRestore && (
+        <div className="pricing-restore-panel">
+          <p>
+            Use the <strong>email</strong> from your Stripe receipt, or paste a{" "}
+            <strong>gift / session code</strong> (starts with <code>cs_</code>).
+          </p>
+          <label>
+            Email
+            <input
+              type="email"
+              value={restoreEmail}
+              onChange={(e) => setRestoreEmail(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
+          </label>
+          <label>
+            Gift / session code
+            <input
+              type="text"
+              value={restoreCode}
+              onChange={(e) => setRestoreCode(e.target.value)}
+              placeholder="cs_live_… or gift code"
+              autoComplete="off"
+            />
+          </label>
+          <div className="pricing-restore-actions">
+            <button
+              type="button"
+              className="btn primary sm"
+              disabled={checkoutBusy}
+              onClick={() => void submitRestore()}
+            >
+              {checkoutBusy ? (
+                <Loader2 size={14} className="spin" />
+              ) : (
+                <Check size={14} />
+              )}
+              Restore on this device
+            </button>
+            <button
+              type="button"
+              className="btn ghost sm"
+              onClick={() => setShowRestore(false)}
+            >
+              <X size={14} /> Cancel
+            </button>
+          </div>
+          {localMsg && <p className="pricing-restore-msg">{localMsg}</p>}
         </div>
       )}
+
+      {checkoutError && (
+        <p className="pricing-error" role="alert">
+          {checkoutError}
+        </p>
+      )}
+
+      <p className="pricing-footnote">
+        No Play In 432 account required. Web purchases unlock this browser;
+        App Store purchases restore via Apple. Cross-device: use the same Stripe
+        email or gift code on each device.
+      </p>
     </section>
   );
 }

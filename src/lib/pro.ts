@@ -1,34 +1,65 @@
 /**
- * TrueHz Pro entitlement (client-side + Stripe Checkout).
+ * TrueHz entitlement (client-side + Stripe Checkout + native IAP).
  *
- * Free forever: live A=432 / A=440, library, playlists, Learn, limited HQ exports.
- * Pro ($19 one-time): all frequency targets + unlimited TrueHz Convert HQ.
+ * Free: live A=432/440, library, limited HQ exports (lifetime).
+ * Lite ($9.99): all frequency targets, 10 HQ exports / month.
+ * Pro ($19): unlimited HQ, batch export, share-own-clip.
  *
  * Note: localStorage can be spoofed. v1 trusts verified Stripe sessions.
- * Future: license server / signed JWT if abuse appears.
  */
+import {
+  FREE_HQ_EXPORT_LIMIT,
+  FREE_TARGET_HZ,
+  LITE_HQ_EXPORTS_PER_MONTH,
+  TIER_PRICES,
+  featuresForTier,
+  parseTier,
+  tierAtLeast,
+  type TierId,
+} from "./tiers";
 
-export const PRO_PRICE_USD = 19;
-export const PRO_PRICE_LABEL = "$19";
-export const PRO_PRICE_CENTS = 1900;
-export const FREE_HQ_EXPORT_LIMIT = 3;
+export {
+  FREE_HQ_EXPORT_LIMIT,
+  FREE_TARGET_HZ,
+  LITE_HQ_EXPORTS_PER_MONTH,
+  TIER_PRICES,
+  FREE_FEATURES,
+  LITE_FEATURES,
+  PRO_FEATURES,
+  type TierId,
+} from "./tiers";
 
-/** Free tier may set these as concert-reference targets without Pro. */
-export const FREE_TARGET_HZ = [432, 440] as const;
+export const PRO_PRICE_USD = TIER_PRICES.pro.usd;
+export const PRO_PRICE_LABEL = TIER_PRICES.pro.label;
+export const PRO_PRICE_CENTS = TIER_PRICES.pro.cents;
+export const LITE_PRICE_USD = TIER_PRICES.lite.usd;
+export const LITE_PRICE_LABEL = TIER_PRICES.lite.label;
+export const LITE_PRICE_CENTS = TIER_PRICES.lite.cents;
 
-const LS_PRO = "playin432_pro";
+const LS_TIER = "playin432_tier";
+const LS_PRO = "playin432_pro"; // legacy "1" flag
 const LS_PRO_SESSION = "playin432_pro_session";
 const LS_HQ_USED = "playin432_hq_exports_used";
+const LS_LITE_HQ = "playin432_lite_hq_month"; // JSON { key, used }
 const EVT = "playin432-pro-change";
 
 export type ProState = {
+  tier: TierId;
+  /** True when tier is pro (legacy + batch/unlimited). */
   isPro: boolean;
+  /** True when tier is lite or pro (all frequencies). */
+  isLiteOrPro: boolean;
   sessionId: string | null;
   hqUsed: number;
   hqRemaining: number;
+  hqPeriodLabel: string;
 };
 
-function readJsonFlag(): boolean {
+function monthKey(d = new Date()): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function readLegacyPro(): boolean {
   try {
     return localStorage.getItem(LS_PRO) === "1";
   } catch {
@@ -36,8 +67,25 @@ function readJsonFlag(): boolean {
   }
 }
 
+export function getTier(): TierId {
+  try {
+    const t = parseTier(localStorage.getItem(LS_TIER));
+    if (t !== "free") return t;
+    // Migrate legacy Pro flag
+    if (readLegacyPro()) return "pro";
+    return "free";
+  } catch {
+    return readLegacyPro() ? "pro" : "free";
+  }
+}
+
+/** @deprecated Prefer getTier() — true only for full Pro. */
 export function isPro(): boolean {
-  return readJsonFlag();
+  return getTier() === "pro";
+}
+
+export function isLiteOrPro(): boolean {
+  return tierAtLeast(getTier(), "lite");
 }
 
 export function getProSessionId(): string | null {
@@ -48,7 +96,7 @@ export function getProSessionId(): string | null {
   }
 }
 
-export function getHqExportsUsed(): number {
+export function getHqExportsUsedLifetime(): number {
   try {
     const n = Number(localStorage.getItem(LS_HQ_USED) ?? "0");
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
@@ -57,16 +105,51 @@ export function getHqExportsUsed(): number {
   }
 }
 
+/** @deprecated use getHqExportsUsedLifetime */
+export const getHqExportsUsed = getHqExportsUsedLifetime;
+
+function getLiteMonthUsage(): { key: string; used: number } {
+  const key = monthKey();
+  try {
+    const raw = localStorage.getItem(LS_LITE_HQ);
+    if (!raw) return { key, used: 0 };
+    const j = JSON.parse(raw) as { key?: string; used?: number };
+    if (j.key !== key) return { key, used: 0 };
+    const used = Number(j.used ?? 0);
+    return { key, used: Number.isFinite(used) && used > 0 ? Math.floor(used) : 0 };
+  } catch {
+    return { key, used: 0 };
+  }
+}
+
 export function getProState(): ProState {
-  const pro = isPro();
-  const hqUsed = getHqExportsUsed();
+  const tier = getTier();
+  const flags = featuresForTier(tier);
+  let hqUsed = 0;
+  let hqRemaining = Number.POSITIVE_INFINITY;
+  let hqPeriodLabel = "unlimited";
+
+  if (tier === "pro") {
+    hqPeriodLabel = "unlimited";
+  } else if (tier === "lite") {
+    const m = getLiteMonthUsage();
+    hqUsed = m.used;
+    hqRemaining = Math.max(0, LITE_HQ_EXPORTS_PER_MONTH - m.used);
+    hqPeriodLabel = "this month";
+  } else {
+    hqUsed = getHqExportsUsedLifetime();
+    hqRemaining = Math.max(0, FREE_HQ_EXPORT_LIMIT - hqUsed);
+    hqPeriodLabel = "lifetime free";
+  }
+
   return {
-    isPro: pro,
+    tier,
+    isPro: tier === "pro",
+    isLiteOrPro: tierAtLeast(tier, "lite"),
     sessionId: getProSessionId(),
     hqUsed,
-    hqRemaining: pro
-      ? Number.POSITIVE_INFINITY
-      : Math.max(0, FREE_HQ_EXPORT_LIMIT - hqUsed),
+    hqRemaining: flags.unlimitedHq ? Number.POSITIVE_INFINITY : hqRemaining,
+    hqPeriodLabel,
   };
 }
 
@@ -88,57 +171,76 @@ export function subscribePro(cb: () => void): () => void {
   };
 }
 
-/** Mark Pro after Stripe session verification succeeds. */
-export function activatePro(sessionId: string) {
+function writeTier(tier: TierId, sessionId: string | null) {
   try {
-    localStorage.setItem(LS_PRO, "1");
-    localStorage.setItem(LS_PRO_SESSION, sessionId);
+    localStorage.setItem(LS_TIER, tier);
+    if (tier === "pro") localStorage.setItem(LS_PRO, "1");
+    else localStorage.removeItem(LS_PRO);
+    if (sessionId) localStorage.setItem(LS_PRO_SESSION, sessionId);
   } catch {
     /* private mode */
   }
-  // Mirror into IndexedDB so Pro survives some WebView storage glitches
-  void persistProToDb(sessionId);
+  void persistTierToDb(tier, sessionId);
   emitChange();
+}
+
+/** Activate Lite or Pro after Stripe / gift / IAP verification. */
+export function activateTier(tier: TierId, sessionId: string) {
+  if (tier !== "lite" && tier !== "pro") return;
+  // Never downgrade pro → lite on activate
+  if (getTier() === "pro" && tier === "lite") {
+    writeTier("pro", sessionId || getProSessionId() || "keep");
+    return;
+  }
+  writeTier(tier, sessionId);
+}
+
+/** Mark Pro after Stripe session verification succeeds (legacy). */
+export function activatePro(sessionId: string) {
+  activateTier("pro", sessionId);
+}
+
+export function activateLite(sessionId: string) {
+  activateTier("lite", sessionId);
 }
 
 /** Dev / support only — not exposed in UI. */
 export function deactivatePro() {
   try {
+    localStorage.removeItem(LS_TIER);
     localStorage.removeItem(LS_PRO);
     localStorage.removeItem(LS_PRO_SESSION);
   } catch {
     /* ignore */
   }
-  void persistProToDb(null);
+  void persistTierToDb("free", null);
   emitChange();
 }
 
-async function persistProToDb(sessionId: string | null) {
+async function persistTierToDb(tier: TierId, sessionId: string | null) {
   try {
     const { openDbForPro } = await import("./db");
-    await openDbForPro(sessionId);
+    // Store session for pro/lite; null clears
+    await openDbForPro(tier === "free" ? null : sessionId || tier);
+    // Also store tier string in settings if available
+    try {
+      localStorage.setItem(LS_TIER, tier);
+    } catch {
+      /* ignore */
+    }
   } catch {
     /* optional backup */
   }
 }
 
-/**
- * On launch: if localStorage lost Pro but IndexedDB still has it, restore flag.
- * (Does not restore across web ↔ native origin — use restoreProAccess for that.)
- */
 export async function hydrateProFromBackup(): Promise<boolean> {
-  if (isPro()) return true;
+  if (getTier() !== "free") return true;
   try {
     const { loadProFromDb } = await import("./db");
     const sessionId = await loadProFromDb();
     if (sessionId) {
-      try {
-        localStorage.setItem(LS_PRO, "1");
-        localStorage.setItem(LS_PRO_SESSION, sessionId);
-      } catch {
-        /* ignore */
-      }
-      emitChange();
+      // Legacy backup only stored session — treat as Pro
+      activatePro(sessionId);
       return true;
     }
   } catch {
@@ -152,27 +254,78 @@ export function isTargetHzFree(hz: number): boolean {
 }
 
 export function canUseTargetHz(hz: number): boolean {
-  return isPro() || isTargetHzFree(hz);
+  return isLiteOrPro() || isTargetHzFree(hz);
+}
+
+export function canBatchExport(): boolean {
+  return getTier() === "pro";
+}
+
+export function canShareOwnClip(): boolean {
+  return getTier() === "pro";
 }
 
 export type ExportGate =
-  | { ok: true; remaining: number }
-  | { ok: false; reason: "limit"; used: number; limit: number };
+  | { ok: true; remaining: number; period: string }
+  | { ok: false; reason: "limit"; used: number; limit: number; period: string };
 
 export function canExportHq(): ExportGate {
-  if (isPro()) return { ok: true, remaining: Number.POSITIVE_INFINITY };
-  const used = getHqExportsUsed();
-  if (used >= FREE_HQ_EXPORT_LIMIT) {
-    return { ok: false, reason: "limit", used, limit: FREE_HQ_EXPORT_LIMIT };
+  const tier = getTier();
+  if (tier === "pro") {
+    return {
+      ok: true,
+      remaining: Number.POSITIVE_INFINITY,
+      period: "unlimited",
+    };
   }
-  return { ok: true, remaining: FREE_HQ_EXPORT_LIMIT - used };
+  if (tier === "lite") {
+    const m = getLiteMonthUsage();
+    if (m.used >= LITE_HQ_EXPORTS_PER_MONTH) {
+      return {
+        ok: false,
+        reason: "limit",
+        used: m.used,
+        limit: LITE_HQ_EXPORTS_PER_MONTH,
+        period: "month",
+      };
+    }
+    return {
+      ok: true,
+      remaining: LITE_HQ_EXPORTS_PER_MONTH - m.used,
+      period: "month",
+    };
+  }
+  const used = getHqExportsUsedLifetime();
+  if (used >= FREE_HQ_EXPORT_LIMIT) {
+    return {
+      ok: false,
+      reason: "limit",
+      used,
+      limit: FREE_HQ_EXPORT_LIMIT,
+      period: "lifetime",
+    };
+  }
+  return {
+    ok: true,
+    remaining: FREE_HQ_EXPORT_LIMIT - used,
+    period: "lifetime",
+  };
 }
 
 export function recordHqExport() {
-  if (isPro()) return;
+  const tier = getTier();
+  if (tier === "pro") return;
   try {
-    const next = getHqExportsUsed() + 1;
-    localStorage.setItem(LS_HQ_USED, String(next));
+    if (tier === "lite") {
+      const m = getLiteMonthUsage();
+      localStorage.setItem(
+        LS_LITE_HQ,
+        JSON.stringify({ key: m.key, used: m.used + 1 }),
+      );
+    } else {
+      const next = getHqExportsUsedLifetime() + 1;
+      localStorage.setItem(LS_HQ_USED, String(next));
+    }
   } catch {
     /* ignore */
   }
@@ -181,7 +334,6 @@ export function recordHqExport() {
 
 const PROD_API = "https://playin432.com";
 
-/** True when running inside Capacitor (iOS/Android shell). */
 function isCapacitorShell(): boolean {
   try {
     const w = window as unknown as {
@@ -199,13 +351,12 @@ function isCapacitorShell(): boolean {
   if (typeof window === "undefined") return false;
   const { protocol, hostname } = window.location;
   if (protocol === "capacitor:" || protocol === "ionic:") return true;
-  // Capacitor 6+ often uses https://localhost as the WebView origin
   if (
     (hostname === "localhost" || hostname === "127.0.0.1") &&
-    // Heuristic: not a Vite dev server (those use :5173 etc.)
-    (!window.location.port || window.location.port === "" || window.location.port === "443")
+    (!window.location.port ||
+      window.location.port === "" ||
+      window.location.port === "443")
   ) {
-    // Only treat as shell if Capacitor global exists
     return Boolean(
       (window as unknown as { Capacitor?: unknown }).Capacitor,
     );
@@ -213,10 +364,6 @@ function isCapacitorShell(): boolean {
   return false;
 }
 
-/**
- * API origin for Stripe checkout.
- * Always use production when local / Capacitor so /api is never hit on localhost.
- */
 function apiBase(): string {
   const override = (
     import.meta.env.VITE_API_BASE as string | undefined
@@ -235,7 +382,6 @@ function apiBase(): string {
       return o;
     }
   }
-  // Local vite / preview → production Stripe API
   return PROD_API;
 }
 
@@ -245,27 +391,38 @@ function apiUrl(path: string): string {
   return `${base}${p}`;
 }
 
-/** Stripe Checkout (web / desktop browsers, and native fallback). */
-export async function startCheckoutStripe(): Promise<void> {
-  const link = (import.meta.env.VITE_STRIPE_PAYMENT_LINK as string | undefined)
-    ?.trim();
-  if (link) {
-    // Payment Link has fixed return URLs — still open externally on native
-    try {
-      const { openExternalUrl, isNativeApp } = await import("./native");
-      if (isNativeApp()) {
-        await openExternalUrl(link);
-        return;
+export type CheckoutOptions = {
+  /** lite | pro — default pro */
+  tier?: "lite" | "pro";
+  /** Gift purchase — success page shows a redeem code for the recipient */
+  gift?: boolean;
+};
+
+export async function startCheckoutStripe(
+  opts: CheckoutOptions = {},
+): Promise<void> {
+  const tier = opts.tier === "lite" ? "lite" : "pro";
+  const gift = Boolean(opts.gift);
+
+  // Fixed payment links only for non-gift Pro (legacy)
+  if (tier === "pro" && !gift) {
+    const link = (import.meta.env.VITE_STRIPE_PAYMENT_LINK as string | undefined)
+      ?.trim();
+    if (link) {
+      try {
+        const { openExternalUrl, isNativeApp } = await import("./native");
+        if (isNativeApp()) {
+          await openExternalUrl(link);
+          return;
+        }
+      } catch {
+        /* web */
       }
-    } catch {
-      /* web */
+      window.location.href = link;
+      return;
     }
-    window.location.href = link;
-    return;
   }
 
-  // Native: deep-link back into the app (same IndexedDB origin).
-  // Web: stay on playin432.com.
   let successUrl: string | undefined;
   let cancelUrl: string | undefined;
   try {
@@ -286,10 +443,14 @@ export async function startCheckoutStripe(): Promise<void> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        successPath: "/?checkout=success",
+        successPath: gift
+          ? "/?checkout=success&gift=1"
+          : "/?checkout=success",
         cancelPath: "/?checkout=cancel",
         successUrl,
         cancelUrl,
+        tier,
+        gift,
       }),
     });
   } catch {
@@ -303,15 +464,13 @@ export async function startCheckoutStripe(): Promise<void> {
       error?: string;
     } | null;
     throw new Error(
-      body?.error ||
-        `Checkout unavailable (${res.status}). Tried ${url}`,
+      body?.error || `Checkout unavailable (${res.status}). Tried ${url}`,
     );
   }
 
   const data = (await res.json()) as { url?: string };
   if (!data.url) throw new Error("No checkout URL returned from Stripe.");
 
-  // Native: open Stripe in Browser plugin — NEVER window.location (wipes library)
   try {
     const { openExternalUrl, isNativeApp } = await import("./native");
     if (isNativeApp()) {
@@ -324,13 +483,16 @@ export async function startCheckoutStripe(): Promise<void> {
   window.location.href = data.url;
 }
 
-/**
- * Start Pro unlock:
- * - Native (Capacitor): RevenueCat / App Store / Play Billing
- * - Web: Stripe Checkout
- * - If RevenueCat is missing products/keys, fall back to Stripe (production API)
- */
-export async function startCheckout(): Promise<void> {
+export async function startCheckout(
+  opts: CheckoutOptions = {},
+): Promise<void> {
+  const tier = opts.tier === "lite" ? "lite" : "pro";
+  // Gifts & Lite always use Stripe (IAP Lite SKU optional later)
+  if (opts.gift || tier === "lite") {
+    await startCheckoutStripe(opts);
+    return;
+  }
+
   const rc = await import("./revenueCat");
   if (rc.isRevenueCatNative()) {
     try {
@@ -339,18 +501,15 @@ export async function startCheckout(): Promise<void> {
       return;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      // User canceled — don't fall through to Stripe
       if (/cancel/i.test(msg)) throw e;
-      // Missing RC config / packages → Stripe so unlock still works
       console.warn("[Pro] RevenueCat purchase failed, trying Stripe:", msg);
-      await startCheckoutStripe();
+      await startCheckoutStripe(opts);
       return;
     }
   }
-  await startCheckoutStripe();
+  await startCheckoutStripe(opts);
 }
 
-/** Restore App Store / Play purchases (native only). */
 export async function restorePurchases(): Promise<boolean> {
   const rc = await import("./revenueCat");
   if (!rc.isRevenueCatNative()) {
@@ -360,30 +519,29 @@ export async function restorePurchases(): Promise<boolean> {
 }
 
 export type RestoreInput = {
-  /** Email used at Stripe Checkout */
   email?: string;
-  /** Stripe Checkout Session id (cs_live_… / cs_test_…) */
   sessionId?: string;
+  /** Gift / redeem code (cs_… session id or PI432-… token) */
+  code?: string;
 };
 
-/**
- * Restore Pro on this device:
- * 1) App Store / Play (RevenueCat) when native
- * 2) Stripe by email or session id (card checkout)
- */
 export async function restoreProAccess(
   input: RestoreInput = {},
-): Promise<{ ok: boolean; error?: string; source?: "store" | "stripe" }> {
+): Promise<{
+  ok: boolean;
+  error?: string;
+  source?: "store" | "stripe" | "gift";
+  tier?: TierId;
+}> {
   const email = input.email?.trim() || "";
-  const sessionId = input.sessionId?.trim() || "";
+  const sessionId = (input.sessionId || input.code || "").trim();
 
-  // 1) Store restore first when no Stripe credentials provided
   if (!email && !sessionId) {
     try {
       const rc = await import("./revenueCat");
       if (rc.isRevenueCatNative()) {
         const ok = await rc.restorePurchases();
-        if (ok) return { ok: true, source: "store" };
+        if (ok) return { ok: true, source: "store", tier: "pro" };
         return {
           ok: false,
           error:
@@ -391,20 +549,16 @@ export async function restoreProAccess(
         };
       }
     } catch (e) {
-      /* fall through to stripe message */
       const msg = e instanceof Error ? e.message : String(e);
-      if (!/only available/i.test(msg)) {
-        console.warn("[Pro] store restore", e);
-      }
+      if (!/only available/i.test(msg)) console.warn("[Pro] store restore", e);
     }
     return {
       ok: false,
       error:
-        "Enter the email you used at Stripe checkout (or a session id from the receipt) to restore Pro.",
+        "Enter the email you used at Stripe checkout, or a gift/session code from your receipt.",
     };
   }
 
-  // 2) Stripe restore by email / session
   const url = apiUrl("/api/restore-pro");
   let res: Response;
   try {
@@ -426,6 +580,7 @@ export async function restoreProAccess(
   const body = (await res.json().catch(() => null)) as {
     paid?: boolean;
     sessionId?: string;
+    tier?: string;
     error?: string;
   } | null;
 
@@ -436,14 +591,19 @@ export async function restoreProAccess(
     };
   }
 
-  activatePro(body.sessionId);
-  return { ok: true, source: "stripe" };
+  const tier = parseTier(body.tier === "lite" ? "lite" : "pro");
+  const active: TierId = tier === "lite" ? "lite" : "pro";
+  activateTier(active, body.sessionId);
+  return {
+    ok: true,
+    source: body.tier ? "gift" : "stripe",
+    tier: active,
+  };
 }
 
-/** Verify a Checkout Session id and activate Pro if paid. */
 export async function verifyCheckoutSession(
   sessionId: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; tier?: TierId; giftCode?: string }> {
   const res = await fetch(apiUrl("/api/verify-checkout-session"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -460,19 +620,37 @@ export async function verifyCheckoutSession(
   const data = (await res.json()) as {
     paid?: boolean;
     sessionId?: string;
+    tier?: string;
+    gift?: boolean;
+    giftCode?: string;
   };
 
   if (data.paid && data.sessionId) {
-    activatePro(data.sessionId);
-    return { ok: true };
+    const tier: TierId = data.tier === "lite" ? "lite" : "pro";
+    // Gift purchases: gifter should NOT auto-activate on their device
+    if (data.gift) {
+      return {
+        ok: true,
+        tier,
+        giftCode: data.giftCode || data.sessionId,
+      };
+    }
+    activateTier(tier, data.sessionId);
+    return { ok: true, tier };
   }
   return { ok: false, error: "Payment not completed." };
 }
 
-/** Parse return URL from Stripe and verify once. */
 export async function handleCheckoutReturn(
   search: string,
-): Promise<"activated" | "cancel" | "none" | "error"> {
+): Promise<
+  | "activated"
+  | "gift"
+  | "cancel"
+  | "none"
+  | "error"
+  | { kind: "gift"; code: string; tier: TierId }
+> {
   const params = new URLSearchParams(search);
   const status = params.get("checkout");
   if (status === "cancel") return "cancel";
@@ -481,7 +659,6 @@ export async function handleCheckoutReturn(
   const sessionId =
     params.get("session_id") || params.get("sessionId") || "";
   if (!sessionId) {
-    // Payment Link may not pass session_id — honor success if configured
     if (import.meta.env.VITE_STRIPE_TRUST_SUCCESS_PARAM === "1") {
       activatePro(`link_${Date.now()}`);
       return "activated";
@@ -490,7 +667,15 @@ export async function handleCheckoutReturn(
   }
 
   const result = await verifyCheckoutSession(sessionId);
-  return result.ok ? "activated" : "error";
+  if (!result.ok) return "error";
+  if (result.giftCode) {
+    return {
+      kind: "gift",
+      code: result.giftCode,
+      tier: result.tier || "pro",
+    };
+  }
+  return "activated";
 }
 
 export function stripCheckoutParams() {
@@ -505,6 +690,7 @@ export function stripCheckoutParams() {
     url.searchParams.delete("checkout");
     url.searchParams.delete("session_id");
     url.searchParams.delete("sessionId");
+    url.searchParams.delete("gift");
     window.history.replaceState({}, "", url.pathname + url.search + url.hash);
   } catch {
     /* ignore */

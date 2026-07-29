@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  canBatchExport,
   canExportHq,
+  canShareOwnClip,
   canUseTargetHz,
   getProState,
   hydrateProFromBackup,
@@ -8,6 +10,7 @@ import {
   restorePurchases,
   startCheckout,
   subscribePro,
+  type CheckoutOptions,
   type ExportGate,
   type ProState,
 } from "../lib/pro";
@@ -21,12 +24,10 @@ export function usePro() {
 
   useEffect(() => subscribePro(() => setState(getProState())), []);
 
-  // Recover Pro from IndexedDB backup if localStorage was cleared
   useEffect(() => {
     void (async () => {
       const ok = await hydrateProFromBackup();
       if (ok) setState(getProState());
-      // Native: also sync App Store entitlement on launch
       if (isRevenueCatNative() && !getProState().isPro) {
         try {
           const { syncProFromCustomerInfo, initRevenueCat } = await import(
@@ -46,11 +47,11 @@ export function usePro() {
 
   const exportGate: ExportGate = canExportHq();
 
-  const upgrade = useCallback(async () => {
+  const upgrade = useCallback(async (opts?: CheckoutOptions) => {
     setCheckoutBusy(true);
     setCheckoutError(null);
     try {
-      await startCheckout();
+      await startCheckout(opts ?? { tier: "pro" });
       setCheckoutBusy(false);
       setState(getProState());
     } catch (e) {
@@ -61,7 +62,6 @@ export function usePro() {
     }
   }, []);
 
-  /** App Store / Play restore only */
   const restore = useCallback(async () => {
     setCheckoutBusy(true);
     setCheckoutError(null);
@@ -82,25 +82,21 @@ export function usePro() {
     }
   }, []);
 
-  /**
-   * Restore Pro: store (no args) or Stripe email / session id.
-   * Returns true when Pro is active after the call.
-   */
   const restoreAccess = useCallback(
-    async (input?: { email?: string; sessionId?: string }) => {
+    async (input?: { email?: string; sessionId?: string; code?: string }) => {
       setCheckoutBusy(true);
       setCheckoutError(null);
       try {
         const result = await restoreProAccess(input ?? {});
         setState(getProState());
         if (!result.ok) {
-          setCheckoutError(result.error || "Could not restore Pro.");
+          setCheckoutError(result.error || "Could not restore access.");
           return false;
         }
         return true;
       } catch (e) {
         setCheckoutError(
-          e instanceof Error ? e.message : "Could not restore Pro.",
+          e instanceof Error ? e.message : "Could not restore access.",
         );
         return false;
       } finally {
@@ -114,6 +110,8 @@ export function usePro() {
     ...state,
     exportGate,
     canUseTargetHz,
+    canBatchExport: canBatchExport(),
+    canShareOwnClip: canShareOwnClip(),
     checkoutBusy,
     checkoutError,
     setCheckoutError,

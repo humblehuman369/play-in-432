@@ -41,12 +41,16 @@ import type { Playlist, TrackMeta } from "./lib/types";
 import { BRAND } from "./lib/brand";
 import {
   FREE_HQ_EXPORT_LIMIT,
-  canUseTargetHz,
   handleCheckoutReturn,
   recordHqExport,
   stripCheckoutParams,
 } from "./lib/pro";
 import { completeSpotifyLoginFromUrl } from "./lib/spotify";
+import { BatchExportPanel } from "./components/BatchExportPanel";
+import {
+  ShareDemoView,
+  parseShareParams,
+} from "./components/ShareDemoView";
 import {
   PITCH_PRESETS,
   centsFromRatio,
@@ -59,7 +63,7 @@ import {
 } from "./lib/retune";
 import "./App.css";
 
-type Tab = "player" | "library" | "playlists" | "learn";
+type Tab = "player" | "library" | "playlists" | "learn" | "share";
 type Shell = "landing" | "app";
 
 const SHELL_KEY = "playin432_shell";
@@ -76,6 +80,25 @@ function readShell(): Shell {
 }
 
 export default function App() {
+  // Phase 3 public share page (no shell chrome)
+  const shareParams = useMemo(
+    () => parseShareParams(window.location.search),
+    [],
+  );
+  if (shareParams.isShare) {
+    return (
+      <ShareDemoView
+        embedded
+        initialClip={shareParams.clip}
+        initialTarget={shareParams.hz}
+      />
+    );
+  }
+
+  return <AppMain />;
+}
+
+function AppMain() {
   const lib = useLibrary();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -100,14 +123,14 @@ export default function App() {
 
   const requestTargetHz = useCallback(
     (hz: number) => {
-      if (!canUseTargetHz(hz)) {
+      if (!pro.canUseTargetHz(hz)) {
         openUpgrade("frequency");
         return false;
       }
       player.applyTargetHz(hz);
       return true;
     },
-    [player, openUpgrade],
+    [player, openUpgrade, pro],
   );
 
   const requestDownloadHq = useCallback(async () => {
@@ -169,13 +192,18 @@ export default function App() {
       if (cancelled) return;
       if (result === "activated") {
         setProToast(
-          "TrueHz Pro unlocked. Your library stays on this device — re-import only if you left the app during checkout.",
+          "Purchase unlocked on this device. Your library stays local — re-import only if you left during checkout.",
         );
         pro.refresh();
         stripCheckoutParams();
         enterApp("player");
-        // Library may have been loaded before Pro flag changed; refresh list
         void lib.refresh();
+      } else if (typeof result === "object" && result.kind === "gift") {
+        setProToast(
+          `Gift code ready (${result.tier.toUpperCase()}): ${result.code} — copy and send to the recipient. They use Restore / redeem gift.`,
+        );
+        stripCheckoutParams();
+        enterApp("player");
       } else if (result === "cancel") {
         setProToast("Checkout canceled — Free forever still works.");
         stripCheckoutParams();
@@ -382,7 +410,7 @@ export default function App() {
           onOpenPlayer={() => enterApp("player")}
           onUploadClick={openFilePicker}
           onPickFrequency={(hz) => {
-            if (!canUseTargetHz(hz)) {
+            if (!pro.canUseTargetHz(hz)) {
               openUpgrade("frequency");
               return;
             }
@@ -390,10 +418,11 @@ export default function App() {
             enterApp("player");
           }}
           onOpenLearn={() => enterApp("learn")}
-          onUpgrade={() => void pro.upgrade()}
+          onUpgrade={(opts) => void pro.upgrade(opts)}
           onRestore={() => void pro.restore()}
           onRestoreAccess={(input) => pro.restoreAccess(input)}
           isPro={pro.isPro}
+          tier={pro.tier}
           checkoutBusy={pro.checkoutBusy}
           checkoutError={pro.checkoutError}
           nativeBilling={pro.nativeBilling}
@@ -412,7 +441,7 @@ export default function App() {
           busy={pro.checkoutBusy}
           error={pro.checkoutError}
           onClose={() => setUpgradeOpen(false)}
-          onUpgrade={() => void pro.upgrade()}
+          onUpgrade={() => void pro.upgrade({ tier: "pro" })}
           onRestoreAccess={(input) => pro.restoreAccess(input)}
           onRestoreStore={() => void pro.restore()}
           nativeBilling={pro.nativeBilling}
@@ -528,6 +557,15 @@ export default function App() {
         >
           <BookOpen size={16} />
           Learn
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "share"}
+          className={tab === "share" ? "active" : ""}
+          onClick={() => setTab("share")}
+        >
+          Share
         </button>
       </nav>
 
@@ -703,13 +741,13 @@ export default function App() {
                 targetA={player.settings.targetA}
                 mode={player.settings.mode}
                 retuneStyle={player.settings.retuneStyle}
-                showProLocks={!pro.isPro}
+                showProLocks={!pro.isLiteOrPro}
                 onSelect={(anchor) => {
                   if (anchor.isOriginal) {
                     player.applyFrequencyAnchor(anchor);
                     return;
                   }
-                  if (!canUseTargetHz(anchor.hz)) {
+                  if (!pro.canUseTargetHz(anchor.hz)) {
                     openUpgrade("frequency");
                     return;
                   }
@@ -734,14 +772,14 @@ export default function App() {
                       Math.abs(player.settings.sourceA - p.sourceA) < 0.01 &&
                       Math.abs(player.settings.targetA - p.targetA) < 0.01 &&
                       player.settings.mode === "retuned";
-                    const locked = !canUseTargetHz(p.targetA);
+                    const locked = !pro.canUseTargetHz(p.targetA);
                     return (
                       <button
                         key={p.id}
                         type="button"
                         className={`chip ${on ? "on" : ""} ${locked ? "locked" : ""}`}
                         onClick={() => {
-                          if (!canUseTargetHz(p.targetA)) {
+                          if (!pro.canUseTargetHz(p.targetA)) {
                             openUpgrade("frequency");
                             return;
                           }
@@ -782,7 +820,7 @@ export default function App() {
                       onChange={(e) => {
                         const hz = Number(e.target.value);
                         if (!Number.isFinite(hz)) return;
-                        if (!canUseTargetHz(hz)) {
+                        if (!pro.canUseTargetHz(hz)) {
                           openUpgrade("frequency");
                           return;
                         }
@@ -967,7 +1005,9 @@ export default function App() {
                       <Download size={14} />
                       {BRAND.downloadHqLabel}{" "}
                       {player.settings.exportFormat.toUpperCase()}
-                      {!pro.isPro && pro.exportGate.ok && (
+                      {!pro.isPro &&
+                        pro.exportGate.ok &&
+                        Number.isFinite(pro.exportGate.remaining) && (
                         <span className="export-left">
                           {pro.exportGate.remaining}
                         </span>
@@ -997,6 +1037,18 @@ export default function App() {
                   </p>
                 </div>
               )}
+
+              <BatchExportPanel
+                tracks={lib.tracks}
+                sourceA={player.settings.sourceA}
+                targetA={player.settings.targetA}
+                retuneStyle={player.settings.retuneStyle}
+                bedOn={player.settings.bedOn}
+                bedLevel={player.settings.bedLevel}
+                enabled={pro.canBatchExport}
+                onNeedPro={() => openUpgrade("export")}
+                onError={(msg) => player.setError(msg)}
+              />
 
               <div className="volume-row">
                 <Volume2 size={16} />
@@ -1222,6 +1274,11 @@ export default function App() {
             initialArticleId={learnArticleId}
             onOpenPlayer={() => setTab("player")}
           />
+        )}
+
+        {/* ═══════════════ SHARE TAB (Phase 3) ═══════════════ */}
+        {tab === "share" && (
+          <ShareDemoView />
         )}
 
         {/* ═══════════════ LIBRARY TAB ═══════════════ */}
@@ -1652,7 +1709,7 @@ export default function App() {
         busy={pro.checkoutBusy}
         error={pro.checkoutError}
         onClose={() => setUpgradeOpen(false)}
-        onUpgrade={() => void pro.upgrade()}
+        onUpgrade={() => void pro.upgrade({ tier: "pro" })}
         onRestoreAccess={(input) => pro.restoreAccess(input)}
         onRestoreStore={() => void pro.restore()}
         nativeBilling={pro.nativeBilling}

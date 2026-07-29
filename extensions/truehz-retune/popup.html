@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TrueHz Retune</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Play In 432</h1>
+      <p class="sub">TrueHz™ tab retune</p>
+    </header>
+
+    <label class="row toggle">
+      <span>Retune active</span>
+      <input type="checkbox" id="enabled" />
+    </label>
+
+    <label class="field">
+      Source A (Hz)
+      <input type="number" id="sourceA" value="440" min="100" max="2000" step="0.1" />
+    </label>
+    <label class="field">
+      Target A (Hz)
+      <select id="targetA">
+        <option value="432" selected>432</option>
+        <option value="440">440</option>
+        <option value="444">444</option>
+        <option value="528">528 (Pro/Lite)</option>
+        <option value="417">417 (Pro/Lite)</option>
+      </select>
+    </label>
+
+    <p id="ratio" class="ratio">Ratio: —</p>
+    <p id="status" class="status">Off</p>
+
+    <aside class="disclaimer">
+      This shifts your <strong>browser tab audio output</strong> by a pitch ratio.
+      It does not modify source files or streaming platform masters. Benefits are a
+      personal listening preference — not medical advice.
+    </aside>
+
+    <p class="footer">
+      <a href="https://playin432.com/" target="_blank" rel="noreferrer">playin432.com</a>
+      · Free 440→432 · other targets need Lite/Pro
+    </p>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
