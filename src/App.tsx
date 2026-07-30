@@ -67,7 +67,7 @@ import "./App.css";
 type Tab = "player" | "library" | "playlists" | "learn" | "share";
 type Shell = "landing" | "app";
 
-/** Web: `/` = marketing homepage, `/app` = player shell. Native always uses the app shell. */
+/** `/` = marketing homepage, `/app` = player shell (web path + in-app navigation). */
 function pathWantsApp(): boolean {
   try {
     const p = window.location.pathname.replace(/\/+$/, "") || "/";
@@ -78,10 +78,9 @@ function pathWantsApp(): boolean {
 }
 
 function readShell(): Shell {
-  if (isNativeApp()) return "app";
+  // Cold start (web or native) → homepage unless path/query needs the player.
   if (pathWantsApp()) return "app";
-  // OAuth / checkout / gift returns land on `/` briefly — open app shell so
-  // the homepage does not flash before enterApp runs.
+  // OAuth / checkout / gift returns — open app shell so homepage does not flash.
   try {
     const sp = new URLSearchParams(window.location.search);
     if (
