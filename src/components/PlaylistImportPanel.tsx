@@ -25,6 +25,7 @@ import {
   spotifyTracksToQueries,
   type SpotifyPlaylistSummary,
 } from "../lib/spotify";
+import { isNativeApp } from "../lib/native";
 import type { TrackMeta } from "../lib/types";
 
 type Props = {
@@ -288,21 +289,43 @@ export function PlaylistImportPanel({
                 <Link2 size={14} /> Connect Spotify
               </button>
               <p className="playlist-import-hint">
-                This session will redirect to{" "}
-                <code className="spotify-redirect-uri">
-                  {getSpotifyRedirectUri()}
-                </code>
-                . That string must appear under{" "}
-                <strong>Redirect URIs</strong> in the{" "}
-                <a
-                  href="https://developer.spotify.com/dashboard"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Spotify Dashboard
-                </a>{" "}
-                for your client ID (copy/paste exactly — include the trailing{" "}
-                <code>/</code>).
+                {isNativeApp() ? (
+                  <>
+                    Opens Spotify login in a secure browser sheet (not inside
+                    the player). After you approve, you return here
+                    automatically. Redirect URI must be{" "}
+                    <code className="spotify-redirect-uri">
+                      {getSpotifyRedirectUri()}
+                    </code>{" "}
+                    in the{" "}
+                    <a
+                      href="https://developer.spotify.com/dashboard"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Spotify Dashboard
+                    </a>
+                    .
+                  </>
+                ) : (
+                  <>
+                    This session will redirect to{" "}
+                    <code className="spotify-redirect-uri">
+                      {getSpotifyRedirectUri()}
+                    </code>
+                    . That string must appear under{" "}
+                    <strong>Redirect URIs</strong> in the{" "}
+                    <a
+                      href="https://developer.spotify.com/dashboard"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Spotify Dashboard
+                    </a>{" "}
+                    for your client ID (copy/paste exactly — include the
+                    trailing <code>/</code>).
+                  </>
+                )}
               </p>
             </>
           ) : (

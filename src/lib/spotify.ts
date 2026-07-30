@@ -180,7 +180,18 @@ export async function beginSpotifyLogin(): Promise<void> {
     code_challenge: challenge,
   });
 
-  window.location.assign(`${AUTH_URL}?${params.toString()}`);
+  const authUrl = `${AUTH_URL}?${params.toString()}`;
+
+  // Native: never navigate the Capacitor WebView to Spotify — that leaves
+  // the app on a blank/white screen when Spotify redirects to playin432://…
+  // Open system/in-app browser; appUrlOpen + Browser.close handle the return.
+  if (isNativeApp()) {
+    const { openExternalUrl } = await import("./native");
+    await openExternalUrl(authUrl);
+    return;
+  }
+
+  window.location.assign(authUrl);
 }
 
 async function exchangeToken(
@@ -219,17 +230,25 @@ async function exchangeToken(
 }
 
 /** Handle ?code= redirect; returns true if tokens were obtained. */
-export async function completeSpotifyLoginFromUrl(): Promise<boolean> {
-  const url = new URL(window.location.href);
+export async function completeSpotifyLoginFromUrl(
+  href: string = window.location.href,
+): Promise<boolean> {
+  const url = new URL(href, window.location.origin);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const error = url.searchParams.get("error");
 
   if (error) {
     // Clean URL
-    url.searchParams.delete("error");
-    url.searchParams.delete("state");
-    window.history.replaceState({}, "", url.pathname + url.search);
+    try {
+      const clean = new URL(window.location.href);
+      clean.searchParams.delete("error");
+      clean.searchParams.delete("state");
+      clean.searchParams.delete("code");
+      window.history.replaceState({}, "", clean.pathname + clean.search);
+    } catch {
+      /* ignore */
+    }
     throw new Error(`Spotify auth denied: ${error}`);
   }
 
@@ -259,9 +278,15 @@ export async function completeSpotifyLoginFromUrl(): Promise<boolean> {
   localStorage.removeItem(LS_STATE);
   localStorage.removeItem(LS_REDIRECT);
 
-  url.searchParams.delete("code");
-  url.searchParams.delete("state");
-  window.history.replaceState({}, "", url.pathname + url.search);
+  try {
+    const clean = new URL(window.location.href);
+    clean.searchParams.delete("code");
+    clean.searchParams.delete("state");
+    clean.searchParams.delete("error");
+    window.history.replaceState({}, "", clean.pathname + clean.search);
+  } catch {
+    /* ignore */
+  }
   return true;
 }
 

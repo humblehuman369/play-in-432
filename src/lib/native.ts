@@ -27,6 +27,12 @@ export const APP_URL_SCHEME = "playin432";
 /**
  * Apply a deep-link URL into the in-app SPA location (same origin / IndexedDB).
  * Never navigate the WebView to an external origin.
+ *
+ * Handles:
+ *   playin432://callback?code=…&state=…     (Spotify OAuth)
+ *   playin432://?checkout=success&session_id=…
+ *   playin432://checkout?…
+ *   https://playin432.com/?code=…           (if returned via universal link)
  */
 export function applyDeepLinkUrl(url: string): void {
   try {
@@ -36,18 +42,36 @@ export function applyDeepLinkUrl(url: string): void {
       u.hostname === "playin432.com" || u.hostname === "www.playin432.com";
     if (!isAppScheme && !isProdHost) return;
 
-    // playin432://?checkout=success&session_id=…  or  playin432://checkout?…
     const search = u.search || "";
     const hash = u.hash || "";
     let path = u.pathname || "/";
-    // Custom schemes often put a host-like first segment: playin432://checkout
+
+    // Custom schemes put the first path segment in hostname:
+    //   playin432://callback?code=…  → hostname "callback"
+    //   playin432://?checkout=…      → empty hostname, path "/"
     if (isAppScheme && u.hostname && u.hostname !== "localhost") {
       path = `/${u.hostname}${path === "/" ? "" : path}`;
     }
     if (!path.startsWith("/")) path = `/${path}`;
 
+    // OAuth / checkout returns: land on /app so the player shell mounts and
+    // completeSpotifyLoginFromUrl / handleCheckoutReturn can run with ?code=
+    const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+    const isOauthOrCheckout =
+      params.has("code") ||
+      params.has("checkout") ||
+      params.has("session_id") ||
+      path === "/callback" ||
+      path.startsWith("/callback");
+    if (isAppScheme && isOauthOrCheckout) {
+      path = "/app";
+    }
+
     const next = path + search + hash;
-    const cur = window.location.pathname + window.location.search + window.location.hash;
+    const cur =
+      window.location.pathname +
+      window.location.search +
+      window.location.hash;
     if (next !== cur) {
       window.history.replaceState({}, "", next);
     }
