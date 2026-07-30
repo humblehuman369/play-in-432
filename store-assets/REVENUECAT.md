@@ -2,96 +2,132 @@
 
 Native IAP goes through **RevenueCat**. Web still uses **Stripe**.
 
-## 1. Create project
+**App code is ready.** You need dashboard wiring (one-time) + the public SDK key in `.env`.
 
-1. [app.revenuecat.com](https://app.revenuecat.com) → New project **Play In 432**
-2. Add apps:
-   - **iOS** — bundle `com.playin432.app`
-   - **Android** — package `com.playin432.app` (when ready)
+## Quick path (script)
 
-## 2. Connect App Store
+1. [app.revenuecat.com](https://app.revenuecat.com) → your project (or create **Play In 432**)
+2. **Project settings → API keys → + New**
+   - Version: **V2**
+   - Permissions: `project_configuration` **read_write** for apps, products, entitlements, offerings
+3. Run:
 
-1. RevenueCat → Project → **Apps** → iOS app  
-2. Upload **In-App Purchase Key** (.p8) from App Store Connect  
-   **OR** use Shared Secret / App Store Connect API as RevenueCat documents  
-3. Recommended: App Store Connect → Users → **In-App Purchase Key** for RevenueCat
+```bash
+cd truehz-player
+export REVENUECAT_SECRET_API_KEY='sk_…'   # V2 secret — never commit
+node scripts/setup-revenuecat.mjs
+# optional: only lifetime products (no monthly/yearly)
+# REVENUECAT_SKIP_SUBS=1 node scripts/setup-revenuecat.mjs
+```
 
-### App Store Connect products
+The script creates products, entitlements, packages, writes `.secrets/revenuecat-setup.json`, and updates `.env` with `VITE_REVENUECAT_IOS_API_KEY` when the public key is available.
 
-| Product ID | Type | Entitlement |
-|------------|------|-------------|
-| `com.playin432.app.truehz_lite` | Non-consumable $9.99 | `truehz_lite` |
-| `com.playin432.app.truehz_pro` | Non-consumable $19.99 | `truehz_pro` |
-| `com.playin432.app.truehz_pro.monthly` | Subscription $4.99/mo | `truehz_pro` |
-| `com.playin432.app.truehz_pro.yearly` | Subscription $29.99/yr | `truehz_pro` |
+4. Still manual: **connect App Store credentials** (In-App Purchase Key) under RevenueCat → Apps → iOS.
 
-Import / attach these product IDs in RevenueCat → **Products**.
+---
 
-## 3. Entitlements
+## 1. Project & apps
 
-| ID | Attach |
-|----|--------|
-| `truehz_lite` | Lite non-consumable |
-| `truehz_pro` | All Pro products (lifetime + subs) |
+| App | Bundle / package |
+|-----|------------------|
+| iOS | `com.playin432.app` |
+| Android (later) | `com.playin432.app` |
 
-App code: Pro entitlement implies full access; Lite unlocks frequencies + monthly HQ.
+Existing project id (if already created): see `.secrets/revenuecat-setup.json`.
 
-## 4. Offering
+## 2. Connect App Store (required for real purchases)
 
-1. Create offering identifier: **`default`** (or mark as Current)  
-2. Add packages:
-   - Lite → `com.playin432.app.truehz_lite`
-   - Lifetime → `com.playin432.app.truehz_pro`
-   - Annual / Monthly → if kept  
-3. Make this offering **Current**
+1. App Store Connect → **Users and Access → Integrations → In-App Purchase**  
+2. Generate key → download `.p8` once  
+3. RevenueCat → **Apps → Play In 432 iOS → App Store Connect API / IAP key**  
+4. Upload key + enter Key ID + Issuer ID  
 
-The app prefers packages in order: **lifetime → yearly → monthly → lite**.
+Without this, offerings may be empty on device and purchases fail.
 
-## 5. API keys → app env
+## 3. App Store Connect products (already created)
 
-RevenueCat → Project settings → **API keys**:
+| Product ID | Type | Price (USA) | ASC state |
+|------------|------|-------------|-----------|
+| `com.playin432.app.truehz_lite` | Non-consumable | $9.99 | READY_TO_SUBMIT |
+| `com.playin432.app.truehz_pro` | Non-consumable | ~$19.99 | READY_TO_SUBMIT |
+| `com.playin432.app.truehz_pro.monthly` | Auto-renewable (optional) | $4.99/mo | create if you want subs |
+| `com.playin432.app.truehz_pro.yearly` | Auto-renewable (optional) | $29.99/yr | create if you want subs |
+
+Primary launch path: **Lite + Pro lifetime only**. Subs are optional.
+
+## 4. Entitlements (must match code)
+
+| Lookup key | Products |
+|------------|----------|
+| `truehz_lite` | `…truehz_lite` |
+| `truehz_pro` | `…truehz_pro` (+ monthly/yearly if any) |
+
+Code: `src/lib/revenueCat.ts` — Pro implies full access; Lite = frequencies + 10 HQ/month.
+
+## 5. Offering
+
+| Field | Value |
+|-------|--------|
+| Lookup key | `default` (Current) |
+| Packages | `lite` → Lite product, `lifetime` → Pro lifetime, optional `monthly` / `yearly` |
+
+App prefers packages in order: **lifetime → yearly → monthly** for Pro; **lite** for Lite.
+
+## 6. API keys → app env
 
 | Key | Env var |
 |-----|---------|
-| Apple app public key (`appl_…`) | `VITE_REVENUECAT_IOS_API_KEY` |
-| Google app public key (`goog_…`) | `VITE_REVENUECAT_ANDROID_API_KEY` |
+| Apple public SDK key (`appl_…`) | `VITE_REVENUECAT_IOS_API_KEY` |
+| Google public SDK key (`goog_…`) | `VITE_REVENUECAT_ANDROID_API_KEY` |
 
 ### Local `.env`
 
 ```bash
 VITE_REVENUECAT_IOS_API_KEY=appl_xxxxxxxx
-VITE_REVENUECAT_ANDROID_API_KEY=goog_xxxxxxxx
+# VITE_REVENUECAT_ANDROID_API_KEY=goog_xxxxxxxx
 ```
 
-### Vercel (for web builds that embed keys — optional)
-
-Only needed if you ship a Capacitor web build via CI with keys baked in:
+Then rebuild the native shell so the key is baked into the web assets:
 
 ```bash
-vercel env add VITE_REVENUECAT_IOS_API_KEY production
-vercel env add VITE_REVENUECAT_ANDROID_API_KEY production
+npm run mobile:sync
 ```
 
-Then rebuild / `npm run mobile:sync`.
+`.env` is local-only — do not commit secrets.
 
-## 6. Code map
+## 7. Code map
 
 | File | Role |
 |------|------|
-| `src/lib/revenueCat.ts` | configure, purchase, restore, sync |
+| `src/lib/revenueCat.ts` | configure, packages, purchase Lite/Pro, restore, sync |
 | `src/lib/products.ts` | product IDs |
-| `src/lib/pro.ts` | `startCheckout()` → RC native / Stripe web |
+| `src/lib/pro.ts` | `startCheckout()` → RC native / Stripe web; gifts always Stripe |
 | `src/hooks/usePro.ts` | upgrade + restore UI |
+| `src/components/PricingSection.tsx` | Free / Lite / Pro + gift + restore |
+| `scripts/setup-revenuecat.mjs` | dashboard bootstrap via API v2 |
 
-Entitlement checked: **`truehz_pro`**
+## 8. Test (Sandbox)
 
-## 7. Test
+1. App Store Connect → **Users and Access → Sandbox → Testers** → create tester  
+2. On device: Settings → App Store → Sandbox Account  
+3. `npm run mobile:ios` (or Xcode) → **Unlock Lite** / **Unlock Pro**  
+4. Confirm entitlement unlocks frequencies / batch  
+5. Kill app → **Restore purchases**  
 
-1. App Store Connect → Sandbox Tester account  
-2. Device/simulator signed out of real Apple ID for IAP, use Sandbox  
-3. `npm run mobile:ios` → Unlock Pro → Sandbox purchase sheet  
-4. Kill app → Restore purchases  
+## 9. App Review
 
-## 8. Submit
+When submitting iOS **1.0** (build 5):
 
-When submitting app version 1.0, include IAP **TrueHz Pro** for review (first non-consumable with version).
+- Include **TrueHz Lite** and **TrueHz Pro** IAPs with the version  
+- Review notes: no login required; Free path is full 432 listening without purchase  
+- Paid Apps agreement + banking/tax must be active for IAP to work in production  
+
+## 10. Web (Stripe) — separate from RevenueCat
+
+| Tier | Price | Env |
+|------|-------|-----|
+| Lite | $9.99 | `STRIPE_LITE_PRICE_ID` optional |
+| Pro | $19 | `STRIPE_PRICE_ID` optional |
+| Gifts | same | always Stripe + optional `RESEND_API_KEY` |
+
+Cross-restore: Stripe email / `cs_…` session on any platform; App Store via RevenueCat restore on native.

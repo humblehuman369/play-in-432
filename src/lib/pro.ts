@@ -3,9 +3,10 @@
  *
  * Free: live A=432/440, library, limited HQ exports (lifetime).
  * Lite ($9.99): all frequency targets, 10 HQ exports / month.
- * Pro ($19): unlimited HQ, batch export, share-own-clip.
+ * Pro ($19 web / $19.99 App Store): unlimited HQ, batch export, share-own-clip.
  *
- * Note: localStorage can be spoofed. v1 trusts verified Stripe sessions.
+ * Web → Stripe Checkout · Native → RevenueCat / StoreKit (gifts always Stripe).
+ * Note: localStorage can be spoofed. v1 trusts verified Stripe sessions + RC customerInfo.
  */
 import {
   FREE_HQ_EXPORT_LIMIT,
@@ -496,16 +497,15 @@ export async function startCheckout(
   const rc = await import("./revenueCat");
   if (rc.isRevenueCatNative()) {
     try {
-      const ok =
-        tier === "lite"
-          ? await rc.purchaseLite()
-          : await rc.purchaseDefaultPro();
-      if (!ok) throw new Error("Purchase completed but access was not unlocked.");
+      const ok = await rc.purchaseTier(tier);
+      if (!ok) {
+        throw new Error("Purchase completed but access was not unlocked.");
+      }
       return;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (/cancel/i.test(msg)) throw e;
-      // Missing Lite package etc. → Stripe so unlock still works
+      // Missing package / RC misconfig → Stripe so unlock still works
       console.warn("[Pro] RevenueCat purchase failed, trying Stripe:", msg);
       await startCheckoutStripe(opts);
       return;
@@ -545,7 +545,9 @@ export async function restoreProAccess(
       const rc = await import("./revenueCat");
       if (rc.isRevenueCatNative()) {
         const ok = await rc.restorePurchases();
-        if (ok) return { ok: true, source: "store", tier: "pro" };
+        if (ok) {
+          return { ok: true, source: "store", tier: getTier() };
+        }
         return {
           ok: false,
           error:

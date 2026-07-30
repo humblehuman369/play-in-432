@@ -21,12 +21,24 @@
 
 ## RevenueCat
 
-1. **Products** → import / add `com.playin432.app.truehz_lite`  
+Automated (preferred):
+
+```bash
+export REVENUECAT_SECRET_API_KEY='sk_…'   # V2 secret
+node scripts/setup-revenuecat.mjs
+```
+
+Manual checklist:
+
+1. **Products** → import / add `com.playin432.app.truehz_lite` + `…truehz_pro`  
 2. **Entitlements**:
    - `truehz_lite` → attach Lite product  
    - `truehz_pro` → attach all Pro products  
-3. **Offering** `default`: packages for lite + lifetime (+ monthly/yearly if kept)  
-4. Wire **In-App Purchase .p8** on the iOS app (bundle `com.playin432.app`)
+3. **Offering** `default` (Current): packages `lite` + `lifetime` (+ monthly/yearly if kept)  
+4. Wire **In-App Purchase .p8** on the iOS app (bundle `com.playin432.app`)  
+5. Copy public `appl_…` key → `.env` `VITE_REVENUECAT_IOS_API_KEY` → `npm run mobile:sync`
+
+Full guide: `store-assets/REVENUECAT.md`
 
 ## Web (Stripe)
 

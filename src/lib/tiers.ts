@@ -1,8 +1,8 @@
 /**
  * Play In 432 entitlement tiers (Phase 1 pricing architecture).
  *
- * Free → Lite ($9.99) → Pro ($19)
- * Web: Stripe Checkout · Native: RevenueCat / StoreKit (Pro products; Lite via Stripe email restore until IAP Lite SKU ships)
+ * Free → Lite ($9.99) → Pro ($19 web / App Store price tier ~$19.99)
+ * Web: Stripe Checkout · Native: RevenueCat / StoreKit (Lite + Pro IAPs)
  */
 
 export type TierId = "free" | "lite" | "pro";

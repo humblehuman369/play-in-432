@@ -185,32 +185,43 @@ export async function purchasePackage(pkg: PackageInfo): Promise<boolean> {
   }
 }
 
-/** Prefer lifetime Pro, then yearly, monthly, then Lite. */
+/** Prefer lifetime Pro, then yearly, monthly. Never falls back to Lite. */
 export async function purchaseDefaultPro(): Promise<boolean> {
   const packages = await getPackages();
   if (!packages.length) {
     throw new Error(
-      "No packages available. Configure offerings in the RevenueCat dashboard.",
+      "No packages available. Configure offerings in the RevenueCat dashboard (see store-assets/REVENUECAT.md).",
     );
   }
   const pick =
     packages.find((p) => p.key === "lifetime") ||
     packages.find((p) => p.key === "yearly") ||
     packages.find((p) => p.key === "monthly") ||
-    packages.find((p) => p.key === "lite") ||
-    packages[0];
+    packages.find((p) => p.tier === "pro");
+  if (!pick) {
+    throw new Error(
+      "No Pro package in the current offering. Add com.playin432.app.truehz_pro (and optional subs) to RevenueCat.",
+    );
+  }
   return purchasePackage(pick);
 }
 
 export async function purchaseLite(): Promise<boolean> {
   const packages = await getPackages();
-  const pick = packages.find((p) => p.key === "lite");
+  const pick =
+    packages.find((p) => p.key === "lite") ||
+    packages.find((p) => p.tier === "lite");
   if (!pick) {
     throw new Error(
-      "Lite package not found. Add com.playin432.app.truehz_lite to RevenueCat offerings.",
+      "Lite package not found. Add com.playin432.app.truehz_lite to the RevenueCat default offering.",
     );
   }
   return purchasePackage(pick);
+}
+
+/** Purchase a specific tier (lite | pro). */
+export async function purchaseTier(tier: "lite" | "pro"): Promise<boolean> {
+  return tier === "lite" ? purchaseLite() : purchaseDefaultPro();
 }
 
 export async function restorePurchases(): Promise<boolean> {

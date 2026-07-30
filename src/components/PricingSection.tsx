@@ -147,7 +147,8 @@ export function PricingSection({
             <Crown size={18} /> TrueHz Pro
           </h3>
           <p className="pricing-price">
-            {PRO_PRICE_LABEL} <span>one-time · {PRO_PRICE_LABEL}</span>
+            {nativeBilling ? "$19.99" : PRO_PRICE_LABEL}{" "}
+            <span>one-time{nativeBilling ? " · via App Store" : ""}</span>
           </p>
           <ul className="pricing-features">
             {PRO_FEATURES.map((f) => (
@@ -172,7 +173,7 @@ export function PricingSection({
               ) : (
                 <Crown size={16} />
               )}
-              Unlock Pro — {PRO_PRICE_LABEL}
+              Unlock Pro — {nativeBilling ? "$19.99" : PRO_PRICE_LABEL}
             </button>
           )}
         </div>

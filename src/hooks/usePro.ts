@@ -28,7 +28,7 @@ export function usePro() {
     void (async () => {
       const ok = await hydrateProFromBackup();
       if (ok) setState(getProState());
-      if (isRevenueCatNative() && !getProState().isPro) {
+      if (isRevenueCatNative()) {
         try {
           const { syncProFromCustomerInfo, initRevenueCat } = await import(
             "../lib/revenueCat"
@@ -37,7 +37,7 @@ export function usePro() {
           await syncProFromCustomerInfo();
           setState(getProState());
         } catch {
-          /* optional */
+          /* optional until RC keys + offerings are configured */
         }
       }
     })();
