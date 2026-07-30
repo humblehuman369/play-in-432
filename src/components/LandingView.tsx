@@ -11,7 +11,6 @@ import {
   Play,
   Shield,
   Sparkles,
-  Upload,
   Waves,
   X,
 } from "lucide-react";
