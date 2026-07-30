@@ -46,6 +46,7 @@ import {
   stripCheckoutParams,
 } from "./lib/pro";
 import { completeSpotifyLoginFromUrl } from "./lib/spotify";
+import { isNativeApp } from "./lib/native";
 import { BatchExportPanel } from "./components/BatchExportPanel";
 import {
   ShareDemoView,
@@ -66,17 +67,53 @@ import "./App.css";
 type Tab = "player" | "library" | "playlists" | "learn" | "share";
 type Shell = "landing" | "app";
 
-const SHELL_KEY = "playin432_shell";
+/** Web: `/` = marketing homepage, `/app` = player shell. Native always uses the app shell. */
+function pathWantsApp(): boolean {
+  try {
+    const p = window.location.pathname.replace(/\/+$/, "") || "/";
+    return p === "/app" || p.startsWith("/app/");
+  } catch {
+    return false;
+  }
+}
 
 function readShell(): Shell {
+  if (isNativeApp()) return "app";
+  if (pathWantsApp()) return "app";
+  // OAuth / checkout / gift returns land on `/` briefly — open app shell so
+  // the homepage does not flash before enterApp runs.
   try {
-    // Returning visitors with a saved preference open the app shell.
-    // First visit always lands on the marketing homepage.
-    if (sessionStorage.getItem(SHELL_KEY) === "app") return "app";
+    const sp = new URLSearchParams(window.location.search);
+    if (
+      sp.has("checkout") ||
+      sp.has("session_id") ||
+      sp.has("redeem") ||
+      (sp.has("code") && sp.has("state"))
+    ) {
+      return "app";
+    }
   } catch {
-    /* private mode */
+    /* ignore */
   }
   return "landing";
+}
+
+function setWebShellPath(shell: Shell, mode: "push" | "replace" = "push") {
+  if (isNativeApp()) return;
+  try {
+    const url = new URL(window.location.href);
+    const nextPath = shell === "app" ? "/app" : "/";
+    const curPath = url.pathname.replace(/\/+$/, "") || "/";
+    const already =
+      shell === "app" ? curPath === "/app" : curPath === "/" || curPath === "";
+    if (already) return;
+    url.pathname = nextPath;
+    const next = url.pathname + url.search + url.hash;
+    if (mode === "replace") window.history.replaceState({}, "", next);
+    else window.history.pushState({}, "", next);
+  } catch {
+    /* ignore */
+  }
 }
 
 export default function App() {
@@ -158,20 +195,22 @@ function AppMain({
   const enterApp = useCallback((nextTab: Tab = "player") => {
     setShell("app");
     setTab(nextTab);
-    try {
-      sessionStorage.setItem(SHELL_KEY, "app");
-    } catch {
-      /* ignore */
-    }
+    setWebShellPath("app", "push");
   }, []);
 
   const showLanding = useCallback(() => {
     setShell("landing");
-    try {
-      sessionStorage.setItem(SHELL_KEY, "landing");
-    } catch {
-      /* ignore */
-    }
+    setWebShellPath("landing", "push");
+  }, []);
+
+  // Keep shell in sync with browser back/forward (/ ↔ /app).
+  useEffect(() => {
+    if (isNativeApp()) return;
+    const onPop = () => {
+      setShell(pathWantsApp() ? "app" : "landing");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
 
   // Stripe Checkout return (?checkout=success&session_id=…)
@@ -270,16 +309,6 @@ function AppMain({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Returning visitors with a library skip the homepage unless they chose Home.
-  useEffect(() => {
-    if (!lib.ready || lib.tracks.length === 0) return;
-    try {
-      if (sessionStorage.getItem(SHELL_KEY) === "landing") return;
-    } catch {
-      /* ignore */
-    }
-    setShell("app");
-  }, [lib.ready, lib.tracks.length]);
   /** Deep-link into Learn (e.g. how-far-to-retune from frequency strip) */
   const [learnArticleId, setLearnArticleId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
