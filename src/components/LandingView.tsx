@@ -3,6 +3,9 @@ import {
   BookOpen,
   Check,
   Download,
+  FolderOpen,
+  Link2,
+  ListMusic,
   Lock,
   Music2,
   Play,
@@ -21,6 +24,10 @@ import { canUseTargetHz } from "../lib/pro";
 type Props = {
   onOpenPlayer: () => void;
   onUploadClick: () => void;
+  /** Open Playlists tab (import M3U / local list) */
+  onOpenPlaylists?: () => void;
+  /** Connect Spotify (playlist metadata → match your files) */
+  onConnectSpotify?: () => void;
   /** Apply a target concert A and open the player */
   onPickFrequency?: (hz: number) => void;
   onOpenLearn?: () => void;
@@ -68,18 +75,18 @@ const OFFERS = [
 const STEPS = [
   {
     n: "1",
-    title: "Drop a track",
-    body: "Your files. Your library. Import once — it stays in the browser until you delete it.",
+    title: "Add your music",
+    body: "Import files from your phone or computer, or pull a playlist (Spotify match or M3U) against songs you already own.",
   },
   {
     n: "2",
-    title: "Pick source → target",
-    body: "Presets for 440→432, 528, reverse, or dial custom concert A. Re-anchor or full ratio.",
+    title: "Choose 432 (or another target)",
+    body: "One tap for A=440 → A=432. Or try 528, Solfeggio, and custom targets when you upgrade.",
   },
   {
     n: "3",
-    title: "Listen or export HQ",
-    body: "Play retuned live. Optional pure-tone bed. Download HQ WAV when you want TrueHz Convert quality offline.",
+    title: "Listen — export if you need a file",
+    body: "Hear the retune live. Download HQ WAV/MP3 when you want the file offline.",
   },
 ] as const;
 
@@ -118,6 +125,8 @@ const FAQS = [
 export function LandingView({
   onOpenPlayer,
   onUploadClick,
+  onOpenPlaylists,
+  onConnectSpotify,
   onPickFrequency,
   onOpenLearn,
   onUpgrade,
@@ -135,6 +144,8 @@ export function LandingView({
   importing,
 }: Props) {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const openPlaylists = onOpenPlaylists ?? onOpenPlayer;
+  const connectSpotify = onConnectSpotify ?? openPlaylists;
 
   return (
     <div className="landing">
@@ -153,8 +164,8 @@ export function LandingView({
             Open player
           </button>
           <button type="button" className="btn primary sm" onClick={onUploadClick}>
-            <Upload size={15} />
-            Drop music
+            <FolderOpen size={15} />
+            Add music
           </button>
         </div>
       </nav>
@@ -177,7 +188,7 @@ export function LandingView({
         <div className="landing-hero-copy">
           <p className="landing-kicker">
             <Sparkles size={14} />
-            Real retune · Honest claims · Private by default
+            Private player · Free 432 listening · No account
           </p>
           <h1 className="landing-title">
             Your music.
@@ -185,43 +196,75 @@ export function LandingView({
             <span className="landing-title-accent">Retuned to 432.</span>
           </h1>
           <p className="landing-lead">
-            {BRAND.product} is a browser player for{" "}
-            <strong>music you already own</strong>. Retune live with{" "}
-            {BRAND.techMark} technology — A=440 →{" "}
-            <span className="gold-hz">A=432</span>, 528, or custom — without
-            uploading your library or pretending we stream Spotify in “pure 432.”
+            Add songs you already own, retune them live to{" "}
+            <span className="gold-hz">A=432</span> (or other targets), and play
+            privately on this device. We never stream Spotify audio — connect
+            Spotify only to match playlist names to your files.
           </p>
 
+          <p className="landing-start-label">How do you want to start?</p>
           <div
-            className={`landing-drop ${dragOver ? "over" : ""}`}
+            className={`landing-start-grid ${dragOver ? "drag-over" : ""}`}
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
             onDrop={onDrop}
-            onClick={onUploadClick}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") onUploadClick();
-            }}
           >
-            <Upload size={26} className="drop-icon" />
-            <h2>
-              {importing ? "Importing…" : "Drop a track to hear the difference"}
-            </h2>
-            <p>MP3 · WAV · FLAC · M4A · OGG — stays on this device</p>
-          </div>
-
-          <div className="landing-cta-row">
             <button
               type="button"
-              className="btn primary lg"
+              className="landing-start-card landing-start-primary"
               onClick={onUploadClick}
+              disabled={importing}
             >
-              <Play size={18} />
-              Start free — no account
+              <span className="landing-start-icon" aria-hidden>
+                <FolderOpen size={22} />
+              </span>
+              <span className="landing-start-title">
+                {importing ? "Importing…" : "Add music files"}
+              </span>
+              <span className="landing-start-desc">
+                From your phone or computer — MP3, WAV, FLAC, M4A. Stays on
+                this device.
+              </span>
+              <span className="landing-start-hint">
+                Tip: on a computer you can also drag files onto this page
+              </span>
             </button>
-            <button type="button" className="btn ghost lg" onClick={onOpenPlayer}>
-              Explore the player
+
+            <button
+              type="button"
+              className="landing-start-card"
+              onClick={connectSpotify}
+            >
+              <span className="landing-start-icon" aria-hidden>
+                <Link2 size={22} />
+              </span>
+              <span className="landing-start-title">Connect Spotify</span>
+              <span className="landing-start-desc">
+                Match a Spotify playlist to songs already in your library.
+                Metadata only — no streaming.
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className="landing-start-card"
+              onClick={openPlaylists}
+            >
+              <span className="landing-start-icon" aria-hidden>
+                <ListMusic size={22} />
+              </span>
+              <span className="landing-start-title">Import a playlist</span>
+              <span className="landing-start-desc">
+                Bring an M3U or build lists inside the app after you add
+                tracks.
+              </span>
+            </button>
+          </div>
+
+          <div className="landing-cta-row landing-cta-secondary">
+            <button type="button" className="btn ghost" onClick={onOpenPlayer}>
+              <Play size={16} />
+              Skip to player
             </button>
           </div>
 
@@ -230,10 +273,10 @@ export function LandingView({
               <Shield size={14} /> Free · no sign-up
             </li>
             <li>
-              <Lock size={14} /> Files never leave your device
+              <Lock size={14} /> Files stay on your device
             </li>
             <li>
-              <Check size={14} /> Powered by {BRAND.techMark}
+              <Check size={14} /> {BRAND.techMark} retune
             </li>
           </ul>
         </div>
@@ -458,16 +501,20 @@ export function LandingView({
       <section className="landing-final">
         <h2>Ready when you are</h2>
         <p>
-          No account. No waitlist. Drop a song you love and hear it retuned with{" "}
-          {BRAND.techMark}.
+          No account. Add a few tracks you love — or match a playlist — and hear
+          them retuned with {BRAND.techMark}.
         </p>
         <div className="landing-cta-row">
           <button type="button" className="btn primary lg" onClick={onUploadClick}>
-            <Upload size={18} />
-            Drop music now
+            <FolderOpen size={18} />
+            Add music
+          </button>
+          <button type="button" className="btn ghost lg" onClick={connectSpotify}>
+            <Link2 size={18} />
+            Connect Spotify
           </button>
           <button type="button" className="btn ghost lg" onClick={onOpenPlayer}>
-            Open full player
+            Open player
           </button>
         </div>
         <p className="landing-final-foot">{BRAND.footer}</p>

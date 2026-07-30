@@ -481,6 +481,20 @@ function AppMain({
         <LandingView
           onOpenPlayer={() => enterApp("player")}
           onUploadClick={openFilePicker}
+          onOpenPlaylists={() => enterApp("playlists")}
+          onConnectSpotify={() => {
+            enterApp("playlists");
+            void import("./lib/spotify")
+              .then(({ beginSpotifyLogin, isSpotifyConnected }) => {
+                if (isSpotifyConnected()) return;
+                return beginSpotifyLogin();
+              })
+              .catch((e) => {
+                player.setError(
+                  e instanceof Error ? e.message : "Spotify login failed.",
+                );
+              });
+          }}
           onPickFrequency={(hz) => {
             if (!pro.canUseTargetHz(hz)) {
               openUpgrade("frequency");
