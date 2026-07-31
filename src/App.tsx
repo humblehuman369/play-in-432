@@ -1527,6 +1527,7 @@ function AppMain({
                 return pl;
               }}
               onSelectPlaylist={(id) => setSelectedPlaylistId(id)}
+              onOpenLibrary={() => setTab("library")}
             />
 
             <div className="playlist-layout">

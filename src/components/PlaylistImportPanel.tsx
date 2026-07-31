@@ -24,6 +24,7 @@ import {
   isSpotifyConnected,
   spotifyTracksToQueries,
   type SpotifyPlaylistSummary,
+  type SpotifyPlaylistTrack,
 } from "../lib/spotify";
 import { isNativeApp } from "../lib/native";
 import type { TrackMeta } from "../lib/types";
@@ -36,6 +37,8 @@ type Props = {
   ) => Promise<{ id: string; name: string } | null>;
   onSelectPlaylist?: (id: string) => void;
   onError?: (message: string | null) => void;
+  /** Jump user to Library tab to add files */
+  onOpenLibrary?: () => void;
 };
 
 export function PlaylistImportPanel({
@@ -43,12 +46,18 @@ export function PlaylistImportPanel({
   onCreatePlaylist,
   onSelectPlaylist,
   onError,
+  onOpenLibrary,
 }: Props) {
   const m3uInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [lastReport, setLastReport] = useState<MatchReport | null>(null);
   const [lastName, setLastName] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{
+    name: string;
+    tracks: SpotifyPlaylistTrack[];
+    report: MatchReport | null;
+  } | null>(null);
 
   const [spotifyOk, setSpotifyOk] = useState(isSpotifyConnected);
   const [spotifyLists, setSpotifyLists] = useState<SpotifyPlaylistSummary[]>(
@@ -56,6 +65,7 @@ export function PlaylistImportPanel({
   );
   const [spotifyLoading, setSpotifyLoading] = useState(false);
   const clientId = getSpotifyClientId();
+  const libraryCount = tracks.length;
 
   const finishImport = useCallback(
     async (name: string, report: MatchReport) => {
@@ -63,19 +73,21 @@ export function PlaylistImportPanel({
       setLastName(name);
       if (!report.matchedIds.length) {
         setStatus(
-          `No matches in your library (0 / ${report.total}). Import the audio files first, then try again.`,
+          libraryCount === 0
+            ? `“${name}” has ${report.total} Spotify songs listed below — but your library is empty. Add those audio files first (Library → Add music), then match again.`
+            : `Found ${report.total} Spotify songs, but 0 matched files in your library (${libraryCount} local tracks). Titles must match files you already imported.`,
         );
         return;
       }
       const pl = await onCreatePlaylist(name, report.matchedIds);
       if (pl) {
         setStatus(
-          `Created “${pl.name}” with ${report.matched} of ${report.total} tracks matched from your library.`,
+          `Created “${pl.name}” with ${report.matched} of ${report.total} tracks from your library. Unmatched Spotify songs stay listed below — import those files to add them.`,
         );
         onSelectPlaylist?.(pl.id);
       }
     },
-    [onCreatePlaylist, onSelectPlaylist],
+    [onCreatePlaylist, onSelectPlaylist, libraryCount],
   );
 
   const importM3u = useCallback(
@@ -153,32 +165,46 @@ export function PlaylistImportPanel({
     return () => window.clearTimeout(t);
   }, [loadSpotifyPlaylists]);
 
-  const importSpotifyPlaylist = useCallback(
+  const openSpotifyPlaylist = useCallback(
     async (pl: SpotifyPlaylistSummary) => {
       setBusy(true);
       setStatus(null);
       onError?.(null);
+      setPreview(null);
       try {
         const spTracks = await fetchPlaylistTracks(pl.id);
-        const queries = spotifyTracksToQueries(spTracks);
-        if (!queries.length) {
-          setStatus(`“${pl.name}” has no importable tracks.`);
+        if (!spTracks.length) {
+          setStatus(
+            `“${pl.name}” returned no songs from Spotify (empty playlist or region-locked tracks).`,
+          );
           return;
         }
-        const report = matchQueriesToLibrary(queries, tracks);
-        await finishImport(pl.name, report);
+        const queries = spotifyTracksToQueries(spTracks);
+        const report =
+          libraryCount > 0 ? matchQueriesToLibrary(queries, tracks) : null;
+        setPreview({ name: pl.name, tracks: spTracks, report });
+        setLastReport(report);
+        setLastName(pl.name);
+
+        if (!libraryCount) {
+          setStatus(
+            `Showing ${spTracks.length} songs from “${pl.name}”. Spotify does not send audio — add matching files to your library, then tap Match again.`,
+          );
+          return;
+        }
+        await finishImport(pl.name, report!);
       } catch (e) {
         console.error(e);
         onError?.(
           e instanceof Error
             ? e.message
-            : "Failed to import Spotify playlist.",
+            : "Failed to load Spotify playlist tracks.",
         );
       } finally {
         setBusy(false);
       }
     },
-    [tracks, finishImport, onError],
+    [tracks, finishImport, onError, libraryCount],
   );
 
   return (
@@ -188,9 +214,18 @@ export function PlaylistImportPanel({
         <h3>Import playlist</h3>
       </div>
       <p className="playlist-import-lead">
-        Build a Play In 432 playlist from tracks <strong>already in your
-        library</strong>. Streaming services only provide titles — we match
-        them locally. TrueHz retune still needs your files.
+        <strong>Spotify cannot stream or retune inside this app.</strong> We
+        only read playlist <em>names and song titles</em>, then match them to
+        audio files you already added. Library right now:{" "}
+        <strong>{libraryCount}</strong> track{libraryCount === 1 ? "" : "s"}.
+        {libraryCount === 0 && onOpenLibrary && (
+          <>
+            {" "}
+            <button type="button" className="link-btn" onClick={onOpenLibrary}>
+              Add music to Library first →
+            </button>
+          </>
+        )}
       </p>
 
       <div className="playlist-import-grid">
@@ -245,8 +280,9 @@ export function PlaylistImportPanel({
             <span>Spotify playlist</span>
           </div>
           <p>
-            Connect Spotify, pick a playlist, match song titles to your local
-            library. No Spotify audio is downloaded or retuned.
+            Connect, then tap a playlist to see its songs. We match titles to
+            your local files and build a Play In 432 playlist from matches
+            only.
           </p>
 
           {!clientId ? (
@@ -358,6 +394,12 @@ export function PlaylistImportPanel({
                   <LogOut size={14} /> Disconnect
                 </button>
               </div>
+              {libraryCount === 0 && (
+                <p className="playlist-import-hint playlist-import-warn">
+                  Your library is empty. Tap a playlist to see song titles, then
+                  add those files under Library so we can match and retune them.
+                </p>
+              )}
               {spotifyLists.length > 0 ? (
                 <ul className="spotify-pl-list">
                   {spotifyLists.map((pl) => (
@@ -365,13 +407,16 @@ export function PlaylistImportPanel({
                       <button
                         type="button"
                         className="spotify-pl-item"
-                        disabled={busy || !tracks.length}
-                        onClick={() => void importSpotifyPlaylist(pl)}
+                        disabled={busy}
+                        onClick={() => void openSpotifyPlaylist(pl)}
                       >
                         <span className="spotify-pl-name">{pl.name}</span>
                         <span className="spotify-pl-meta">
-                          {pl.trackCount} tracks
+                          {pl.trackCount} songs on Spotify
                           {pl.owner ? ` · ${pl.owner}` : ""}
+                          {libraryCount === 0
+                            ? " · tap to preview titles"
+                            : " · tap to match library"}
                         </span>
                       </button>
                     </li>
@@ -395,8 +440,63 @@ export function PlaylistImportPanel({
         </p>
       )}
 
-      {lastReport && lastReport.unmatched.length > 0 && (
-        <details className="playlist-import-unmatched">
+      {preview && preview.tracks.length > 0 && (
+        <div className="spotify-track-preview">
+          <div className="spotify-track-preview-head">
+            <h4>
+              Songs in “{preview.name}”{" "}
+              <span>
+                ({preview.tracks.length}
+                {preview.report
+                  ? ` · ${preview.report.matched} matched in library`
+                  : " · preview only"}
+                )
+              </span>
+            </h4>
+            {libraryCount === 0 && onOpenLibrary && (
+              <button
+                type="button"
+                className="btn primary sm"
+                onClick={onOpenLibrary}
+              >
+                Add music to Library
+              </button>
+            )}
+          </div>
+          <ul className="spotify-track-list">
+            {preview.tracks.slice(0, 80).map((t, i) => {
+              const q = { title: t.title, artist: t.artist };
+              const matched = preview.report?.results[i]?.track;
+              return (
+                <li
+                  key={`${t.spotifyUri || t.title}-${i}`}
+                  className={matched ? "is-matched" : "is-unmatched"}
+                >
+                  <span className="spotify-track-label">
+                    {t.artist ? `${t.artist} — ${t.title}` : t.title}
+                  </span>
+                  <span className="spotify-track-flag">
+                    {matched ? "In library" : "Need file"}
+                  </span>
+                </li>
+              );
+            })}
+            {preview.tracks.length > 80 && (
+              <li className="spotify-track-more">
+                …and {preview.tracks.length - 80} more
+              </li>
+            )}
+          </ul>
+          <p className="playlist-import-hint">
+            “Need file” means that Spotify title is not in your Play In 432
+            library yet. Import the MP3/WAV/etc., then open this playlist again
+            to match.
+          </p>
+        </div>
+      )}
+
+      {lastReport && lastReport.unmatched.length > 0 && !preview && (
+        <details className="playlist-import-unmatched" open>
           <summary>
             Unmatched ({lastReport.unmatched.length})
             {lastName ? ` · ${lastName}` : ""}

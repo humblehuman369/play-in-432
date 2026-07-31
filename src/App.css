@@ -2389,6 +2389,93 @@ input[type="range"]:disabled {
   font-weight: 600;
 }
 
+.playlist-import-warn {
+  color: #f0c674;
+  border-left: 3px solid rgba(240, 198, 116, 0.6);
+  padding-left: 0.65rem;
+}
+
+.spotify-track-preview {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.spotify-track-preview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.65rem;
+}
+
+.spotify-track-preview-head h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.spotify-track-preview-head h4 span {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.spotify-track-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 16rem;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.spotify-track-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.45rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+
+.spotify-track-list li.is-matched {
+  background: rgba(0, 212, 170, 0.08);
+}
+
+.spotify-track-list li.is-unmatched {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.spotify-track-label {
+  color: var(--text);
+  min-width: 0;
+}
+
+.spotify-track-flag {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.spotify-track-list li.is-matched .spotify-track-flag {
+  color: var(--accent);
+}
+
+.spotify-track-more {
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 0.35rem 0.45rem;
+}
+
 .spotify-pl-meta {
   font-size: 0.7rem;
   color: var(--muted);
