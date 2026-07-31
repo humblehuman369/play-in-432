@@ -51,26 +51,30 @@ export function getSpotifyClientId(): string | null {
  * Spotify requires HTTPS except for loopback IPs.
  * `localhost` is NOT allowed — use 127.0.0.1 (or [::1]).
  *
- * Always use the **site origin root** with a trailing slash — never the
- * current SPA path (that caused "redirect_uri: Not matching configuration"
- * when the path did not match the Spotify Dashboard allowlist exactly).
+ * Web: site origin root with trailing slash.
+ * Native: HTTPS bridge on playin432.com (custom schemes often fail Spotify
+ * Dashboard matching even when entered). Bridge pages:
+ *   /spotify-start.html → Spotify → /spotify-callback.html → playin432://oauth
  *
- * Dashboard must list every URI you use, character-for-character, e.g.:
- *   https://playin432.com/
- *   http://127.0.0.1:5173/
- *   playin432://callback   (native Capacitor)
- *
+ * Dashboard must list every URI character-for-character.
  * @see https://developer.spotify.com/documentation/web-api/concepts/redirect_uri
  */
+export const SPOTIFY_NATIVE_REDIRECT_URI =
+  "https://playin432.com/spotify-callback.html";
+
+export const SPOTIFY_NATIVE_START_URL =
+  "https://playin432.com/spotify-start.html";
+
 export function getSpotifyRedirectUri(): string {
   const override = import.meta.env.VITE_SPOTIFY_REDIRECT_URI as
     | string
     | undefined;
   if (override?.trim()) return override.trim();
 
-  // Native shell: custom scheme (register same URI in Spotify Dashboard)
+  // Native uses HTTPS bridge pages (not playin432://…) so Spotify always
+  // sees a registered https redirect_uri.
   if (isNativeApp()) {
-    return `${APP_URL_SCHEME}://callback`;
+    return SPOTIFY_NATIVE_REDIRECT_URI;
   }
 
   const { protocol, hostname, port } = window.location;
@@ -97,9 +101,9 @@ export function getSpotifyRedirectUri(): string {
 export function getSpotifyDashboardRedirectHints(): string[] {
   return [
     "https://playin432.com/",
+    "https://playin432.com/spotify-callback.html",
     "https://www.playin432.com/",
     "http://127.0.0.1:5173/",
-    `${APP_URL_SCHEME}://callback`,
   ];
 }
 
@@ -160,6 +164,18 @@ export async function beginSpotifyLogin(): Promise<void> {
     );
   }
 
+  // Native: HTTPS bridge on playin432.com (PKCE in Safari sessionStorage),
+  // then deep-link tokens back via playin432://oauth#…
+  // Avoids Spotify rejecting custom-scheme redirect_uri.
+  if (isNativeApp()) {
+    const { openExternalUrl } = await import("./native");
+    const start = new URL(SPOTIFY_NATIVE_START_URL);
+    start.searchParams.set("client_id", clientId);
+    start.searchParams.set("return", `${APP_URL_SCHEME}://oauth`);
+    await openExternalUrl(start.toString());
+    return;
+  }
+
   const verifier = randomString(64);
   const state = randomString(16);
   const challenge = base64UrlEncode(await sha256(verifier));
@@ -180,18 +196,77 @@ export async function beginSpotifyLogin(): Promise<void> {
     code_challenge: challenge,
   });
 
-  const authUrl = `${AUTH_URL}?${params.toString()}`;
+  window.location.assign(`${AUTH_URL}?${params.toString()}`);
+}
 
-  // Native: never navigate the Capacitor WebView to Spotify — that leaves
-  // the app on a blank/white screen when Spotify redirects to playin432://…
-  // Open system/in-app browser; appUrlOpen + Browser.close handle the return.
-  if (isNativeApp()) {
-    const { openExternalUrl } = await import("./native");
-    await openExternalUrl(authUrl);
-    return;
+/**
+ * Native bridge return: playin432://oauth#access_token=…&refresh_token=…
+ * (tokens already exchanged on https://playin432.com/spotify-callback.html)
+ */
+export function completeSpotifyLoginFromDeepLink(
+  href: string = window.location.href,
+): boolean {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    try {
+      url = new URL(href.replace(/^([^:]+):\/\//, "https://"));
+    } catch {
+      return false;
+    }
   }
 
-  window.location.assign(authUrl);
+  const isOauthHost =
+    url.protocol === `${APP_URL_SCHEME}:` &&
+    (url.hostname === "oauth" ||
+      url.pathname === "/oauth" ||
+      url.pathname.endsWith("oauth") ||
+      // playin432://oauth → hostname oauth
+      url.host === "oauth");
+
+  const hashRaw = url.hash.startsWith("#") ? url.hash.slice(1) : url.hash;
+  const fromHash = new URLSearchParams(hashRaw);
+  const fromSearch = url.searchParams;
+  const access =
+    fromHash.get("access_token") || fromSearch.get("access_token");
+  if (!access) {
+    // Also accept hash-only on any playin432 deep link
+    if (!hashRaw.includes("access_token")) return false;
+  }
+  if (!access && !isOauthHost) return false;
+  const token = access || fromHash.get("access_token");
+  if (!token) return false;
+
+  const expiresIn = Number(
+    fromHash.get("expires_in") || fromSearch.get("expires_in") || "3600",
+  );
+  const refresh =
+    fromHash.get("refresh_token") ||
+    fromSearch.get("refresh_token") ||
+    undefined;
+  const tokenType =
+    fromHash.get("token_type") ||
+    fromSearch.get("token_type") ||
+    "Bearer";
+
+  saveSpotifyTokens({
+    access_token: token,
+    refresh_token: refresh,
+    expires_at: Date.now() + (Math.max(60, expiresIn) - 60) * 1000,
+    token_type: tokenType,
+  });
+
+  try {
+    const clean = new URL(window.location.href);
+    clean.searchParams.delete("access_token");
+    clean.hash = "";
+    if (clean.pathname.includes("oauth")) clean.pathname = "/app";
+    window.history.replaceState({}, "", clean.pathname + clean.search);
+  } catch {
+    /* ignore */
+  }
+  return true;
 }
 
 async function exchangeToken(

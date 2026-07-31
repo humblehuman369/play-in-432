@@ -29,10 +29,10 @@ export const APP_URL_SCHEME = "playin432";
  * Never navigate the WebView to an external origin.
  *
  * Handles:
- *   playin432://callback?code=…&state=…     (Spotify OAuth)
+ *   playin432://oauth#access_token=…        (Spotify native HTTPS bridge)
+ *   playin432://callback?code=…&state=…     (legacy custom-scheme attempt)
  *   playin432://?checkout=success&session_id=…
- *   playin432://checkout?…
- *   https://playin432.com/?code=…           (if returned via universal link)
+ *   https://playin432.com/?code=…
  */
 export function applyDeepLinkUrl(url: string): void {
   try {
@@ -47,22 +47,28 @@ export function applyDeepLinkUrl(url: string): void {
     let path = u.pathname || "/";
 
     // Custom schemes put the first path segment in hostname:
-    //   playin432://callback?code=…  → hostname "callback"
-    //   playin432://?checkout=…      → empty hostname, path "/"
+    //   playin432://oauth#…  → hostname "oauth"
+    //   playin432://?checkout=…  → empty hostname, path "/"
     if (isAppScheme && u.hostname && u.hostname !== "localhost") {
       path = `/${u.hostname}${path === "/" ? "" : path}`;
     }
     if (!path.startsWith("/")) path = `/${path}`;
 
-    // OAuth / checkout returns: land on /app so the player shell mounts and
-    // completeSpotifyLoginFromUrl / handleCheckoutReturn can run with ?code=
-    const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+    const params = new URLSearchParams(
+      search.startsWith("?") ? search.slice(1) : search,
+    );
+    const hashParams = new URLSearchParams(
+      hash.startsWith("#") ? hash.slice(1) : hash,
+    );
     const isOauthOrCheckout =
       params.has("code") ||
       params.has("checkout") ||
       params.has("session_id") ||
+      hashParams.has("access_token") ||
       path === "/callback" ||
-      path.startsWith("/callback");
+      path.startsWith("/callback") ||
+      path === "/oauth" ||
+      path.startsWith("/oauth");
     if (isAppScheme && isOauthOrCheckout) {
       path = "/app";
     }

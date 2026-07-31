@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Connect Spotify — Play In 432</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+        background: #070b0f;
+        color: #e8eef4;
+        padding: 1.5rem;
+        text-align: center;
+      }
+      p {
+        color: #9aa8b5;
+        max-width: 28rem;
+        line-height: 1.5;
+      }
+      code {
+        color: #00d4aa;
+        word-break: break-all;
+      }
+      a {
+        color: #00d4aa;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <h1>Connecting Spotify…</h1>
+      <p id="status">Opening secure Spotify login.</p>
+      <p id="err" hidden></p>
+    </div>
+    <script>
+      (function () {
+        var AUTH = "https://accounts.spotify.com/authorize";
+        var SCOPES = "playlist-read-private playlist-read-collaborative";
+        var REDIRECT = "https://playin432.com/spotify-callback.html";
+        var STORE = "playin432_spotify_bridge_v1";
+
+        function b64url(buf) {
+          var bytes = new Uint8Array(buf);
+          var s = "";
+          for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+          return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        }
+
+        function randomString(n) {
+          var chars =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+          var arr = new Uint8Array(n);
+          crypto.getRandomValues(arr);
+          var out = "";
+          for (var i = 0; i < n; i++) out += chars[arr[i] % chars.length];
+          return out;
+        }
+
+        function fail(msg) {
+          document.getElementById("status").textContent = "Could not start login.";
+          var el = document.getElementById("err");
+          el.hidden = false;
+          el.innerHTML = msg;
+        }
+
+        var q = new URLSearchParams(location.search);
+        var clientId = (q.get("client_id") || "").trim();
+        var ret = (q.get("return") || "playin432://oauth").trim();
+
+        if (!clientId) {
+          fail(
+            "Missing client_id. Open Connect Spotify from the Play In 432 app.",
+          );
+          return;
+        }
+
+        var verifier = randomString(64);
+        var state = randomString(24);
+
+        crypto.subtle
+          .digest("SHA-256", new TextEncoder().encode(verifier))
+          .then(function (digest) {
+            var challenge = b64url(digest);
+            try {
+              sessionStorage.setItem(
+                STORE,
+                JSON.stringify({
+                  verifier: verifier,
+                  state: state,
+                  clientId: clientId,
+                  redirectUri: REDIRECT,
+                  returnUrl: ret,
+                  createdAt: Date.now(),
+                }),
+              );
+            } catch (e) {
+              fail("This browser blocked session storage. Try again in Safari.");
+              return;
+            }
+
+            var params = new URLSearchParams({
+              client_id: clientId,
+              response_type: "code",
+              redirect_uri: REDIRECT,
+              scope: SCOPES,
+              state: state,
+              code_challenge_method: "S256",
+              code_challenge: challenge,
+            });
+            location.replace(AUTH + "?" + params.toString());
+          })
+          .catch(function () {
+            fail("Could not prepare secure login. Try again.");
+          });
+      })();
+    </script>
+  </body>
+</html>

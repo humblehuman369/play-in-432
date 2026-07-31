@@ -45,7 +45,10 @@ import {
   recordHqExport,
   stripCheckoutParams,
 } from "./lib/pro";
-import { completeSpotifyLoginFromUrl } from "./lib/spotify";
+import {
+  completeSpotifyLoginFromDeepLink,
+  completeSpotifyLoginFromUrl,
+} from "./lib/spotify";
 import { isNativeApp } from "./lib/native";
 import { BatchExportPanel } from "./components/BatchExportPanel";
 import {
@@ -219,9 +222,14 @@ function AppMain({
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      // Spotify PKCE callback first (code/state on URL)
+      // Spotify: native HTTPS bridge returns tokens on playin432://oauth#…
+      // Web PKCE returns ?code=&state= on the site origin.
       try {
-        const spotifyDone = await completeSpotifyLoginFromUrl();
+        const fromDeepLink = completeSpotifyLoginFromDeepLink(
+          window.location.href,
+        );
+        const spotifyDone =
+          fromDeepLink || (await completeSpotifyLoginFromUrl());
         if (cancelled) return;
         if (spotifyDone) {
           setProToast(

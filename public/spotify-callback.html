@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Spotify connected — Play In 432</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+        background: #070b0f;
+        color: #e8eef4;
+        padding: 1.5rem;
+        text-align: center;
+      }
+      p {
+        color: #9aa8b5;
+        max-width: 28rem;
+        line-height: 1.5;
+      }
+      code {
+        color: #00d4aa;
+        word-break: break-all;
+        font-size: 0.85rem;
+      }
+      a.btn {
+        display: inline-block;
+        margin-top: 1rem;
+        padding: 0.75rem 1.1rem;
+        border-radius: 999px;
+        background: #00d4aa;
+        color: #04120e;
+        font-weight: 700;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <h1 id="title">Finishing Spotify…</h1>
+      <p id="status">Returning you to Play In 432.</p>
+      <p id="detail"></p>
+      <a id="openApp" class="btn" href="playin432://oauth" hidden>Open Play In 432</a>
+    </div>
+    <script>
+      (function () {
+        var TOKEN_URL = "https://accounts.spotify.com/api/token";
+        var STORE = "playin432_spotify_bridge_v1";
+        var title = document.getElementById("title");
+        var status = document.getElementById("status");
+        var detail = document.getElementById("detail");
+        var openApp = document.getElementById("openApp");
+
+        function showOpen(url) {
+          openApp.hidden = false;
+          openApp.href = url;
+        }
+
+        function fail(msg, extra) {
+          title.textContent = "Spotify login failed";
+          status.textContent = msg;
+          if (extra) detail.innerHTML = "<code>" + extra + "</code>";
+        }
+
+        var q = new URLSearchParams(location.search);
+        var error = q.get("error");
+        var code = q.get("code");
+        var state = q.get("state");
+
+        if (error) {
+          fail("Spotify denied access: " + error);
+          return;
+        }
+        if (!code) {
+          fail("Missing authorization code. Close this window and try again from the app.");
+          return;
+        }
+
+        var raw;
+        try {
+          raw = sessionStorage.getItem(STORE);
+        } catch (e) {
+          raw = null;
+        }
+        if (!raw) {
+          fail(
+            "Login session expired or opened in a different browser. Start again from Connect Spotify in the app.",
+          );
+          return;
+        }
+
+        var session;
+        try {
+          session = JSON.parse(raw);
+        } catch (e) {
+          fail("Corrupt login session. Try again from the app.");
+          return;
+        }
+
+        if (!session.state || session.state !== state) {
+          fail("Security check failed (state mismatch). Try connecting again.");
+          return;
+        }
+
+        var body = new URLSearchParams({
+          grant_type: "authorization_code",
+          code: code,
+          redirect_uri: session.redirectUri || "https://playin432.com/spotify-callback.html",
+          client_id: session.clientId,
+          code_verifier: session.verifier,
+        });
+
+        fetch(TOKEN_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: body,
+        })
+          .then(function (res) {
+            return res.text().then(function (text) {
+              return { ok: res.ok, status: res.status, text: text };
+            });
+          })
+          .then(function (r) {
+            if (!r.ok) {
+              fail("Token exchange failed (" + r.status + ").", r.text.slice(0, 240));
+              return;
+            }
+            var data;
+            try {
+              data = JSON.parse(r.text);
+            } catch (e) {
+              fail("Invalid token response from Spotify.");
+              return;
+            }
+            try {
+              sessionStorage.removeItem(STORE);
+            } catch (e) {}
+
+            var ret = session.returnUrl || "playin432://oauth";
+            var hash = new URLSearchParams({
+              access_token: data.access_token || "",
+              refresh_token: data.refresh_token || "",
+              expires_in: String(data.expires_in || 3600),
+              token_type: data.token_type || "Bearer",
+            });
+            var deep = ret.split("#")[0] + "#" + hash.toString();
+
+            title.textContent = "Connected";
+            status.textContent = "Opening Play In 432…";
+            showOpen(deep);
+            // Prefer auto-return into the installed app
+            location.replace(deep);
+          })
+          .catch(function (e) {
+            fail(
+              "Network error talking to Spotify.",
+              e && e.message ? e.message : String(e),
+            );
+          });
+      })();
+    </script>
+  </body>
+</html>
