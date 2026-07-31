@@ -465,7 +465,6 @@ export function PlaylistImportPanel({
           </div>
           <ul className="spotify-track-list">
             {preview.tracks.slice(0, 80).map((t, i) => {
-              const q = { title: t.title, artist: t.artist };
               const matched = preview.report?.results[i]?.track;
               return (
                 <li
