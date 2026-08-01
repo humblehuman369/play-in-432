@@ -1,6 +1,6 @@
 /**
- * Spotify Web API — PKCE auth + playlist fetch.
- * Used only for metadata; matching happens against local library.
+ * Spotify Web API — PKCE auth + playlist / liked-songs metadata.
+ * Used only for titles; matching happens against local library.
  * Set VITE_SPOTIFY_CLIENT_ID in .env (see .env.example).
  */
 import { APP_URL_SCHEME, isNativeApp } from "./native";
@@ -9,9 +9,14 @@ const AUTH_URL = "https://accounts.spotify.com/authorize";
 const TOKEN_URL = "https://accounts.spotify.com/api/token";
 const API = "https://api.spotify.com/v1";
 
+/** Synthetic id — Liked Songs is not a normal playlist in Spotify's API. */
+export const SPOTIFY_LIKED_SONGS_ID = "__liked_songs__";
+
 const SCOPES = [
   "playlist-read-private",
   "playlist-read-collaborative",
+  /** Required to read Liked Songs via /me/tracks */
+  "user-library-read",
 ].join(" ");
 
 const LS_VERIFIER = "playin432_spotify_pkce_verifier";
@@ -25,6 +30,8 @@ export type SpotifyTokens = {
   refresh_token?: string;
   expires_at: number; // epoch ms
   token_type: string;
+  /** Space-separated scopes granted at token time (if Spotify returned them). */
+  scope?: string;
 };
 
 export type SpotifyPlaylistSummary = {
@@ -33,6 +40,8 @@ export type SpotifyPlaylistSummary = {
   trackCount: number;
   imageUrl: string | null;
   owner: string;
+  /** True for the special Liked Songs library list */
+  isLikedSongs?: boolean;
 };
 
 export type SpotifyPlaylistTrack = {
@@ -249,12 +258,15 @@ export function completeSpotifyLoginFromDeepLink(
     fromHash.get("token_type") ||
     fromSearch.get("token_type") ||
     "Bearer";
+  const scope =
+    fromHash.get("scope") || fromSearch.get("scope") || undefined;
 
   saveSpotifyTokens({
     access_token: token,
     refresh_token: refresh,
     expires_at: Date.now() + (Math.max(60, expiresIn) - 60) * 1000,
     token_type: tokenType,
+    scope: scope || undefined,
   });
 
   try {
@@ -291,6 +303,7 @@ async function exchangeToken(
     refresh_token?: string;
     expires_in: number;
     token_type: string;
+    scope?: string;
   };
 
   const prev = loadSpotifyTokens();
@@ -299,9 +312,17 @@ async function exchangeToken(
     refresh_token: data.refresh_token ?? prev?.refresh_token,
     expires_at: Date.now() + (data.expires_in - 60) * 1000,
     token_type: data.token_type || "Bearer",
+    scope: data.scope ?? prev?.scope,
   };
   saveSpotifyTokens(tokens);
   return tokens;
+}
+
+/** True if the stored token includes user-library-read (Liked Songs). */
+export function hasSpotifyLibraryScope(): boolean {
+  const t = loadSpotifyTokens();
+  const scope = t?.scope || "";
+  return scope.split(/\s+/).includes("user-library-read");
 }
 
 /** Handle ?code= redirect; returns true if tokens were obtained. */
@@ -422,8 +443,70 @@ type SpotifyTrackItem = {
   } | null;
 };
 
+type SpotifySavedTrackItem = {
+  track: {
+    name?: string;
+    uri?: string;
+    duration_ms?: number;
+    artists?: { name: string }[];
+  } | null;
+};
+
+/** Liked Songs (saved tracks) — different endpoint from playlists. */
+export async function fetchLikedTracks(): Promise<SpotifyPlaylistTrack[]> {
+  const out: SpotifyPlaylistTrack[] = [];
+  let path: string | null = "/me/tracks?limit=50";
+
+  while (path) {
+    const apiPath = path.startsWith("http") ? path.replace(API, "") : path;
+    const page: SpotifyPaging<SpotifySavedTrackItem> =
+      await spotifyFetch<SpotifyPaging<SpotifySavedTrackItem>>(apiPath);
+
+    for (const item of page.items) {
+      const t = item.track;
+      if (!t?.name) continue;
+      const artists = t.artists ?? [];
+      out.push({
+        title: t.name,
+        artist: artists.map((a: { name: string }) => a.name).join(", "),
+        durationMs: t.duration_ms ?? null,
+        spotifyUri: t.uri ?? null,
+      });
+    }
+
+    path = page.next ? page.next.replace(API, "") : null;
+  }
+
+  return out;
+}
+
+async function fetchLikedSongsCount(): Promise<number> {
+  try {
+    const page = await spotifyFetch<SpotifyPaging<SpotifySavedTrackItem> & { total?: number }>(
+      "/me/tracks?limit=1",
+    );
+    return typeof page.total === "number" ? page.total : page.items?.length ?? 0;
+  } catch (e) {
+    console.warn("[Spotify] Liked Songs count failed (reconnect for user-library-read?)", e);
+    return -1; // signal scope / permission issue
+  }
+}
+
 export async function fetchUserPlaylists(): Promise<SpotifyPlaylistSummary[]> {
   const out: SpotifyPlaylistSummary[] = [];
+
+  // Liked Songs first — not a normal playlist; needs user-library-read
+  const likedCount = await fetchLikedSongsCount();
+  out.push({
+    id: SPOTIFY_LIKED_SONGS_ID,
+    name: "Liked Songs",
+    // -1 = API denied (reconnect); otherwise Spotify's total
+    trackCount: likedCount,
+    imageUrl: null,
+    owner: "You",
+    isLikedSongs: true,
+  });
+
   let path: string | null = "/me/playlists?limit=50";
 
   while (path) {
@@ -432,6 +515,10 @@ export async function fetchUserPlaylists(): Promise<SpotifyPlaylistSummary[]> {
       await spotifyFetch<SpotifyPaging<SpotifyPlaylistItem>>(apiPath);
 
     for (const p of page.items) {
+      // Avoid duplicate if Spotify ever surfaces a similar name
+      if (/^liked songs$/i.test(p.name) && out.some((x) => x.isLikedSongs)) {
+        continue;
+      }
       out.push({
         id: p.id,
         name: p.name,
@@ -450,6 +537,14 @@ export async function fetchUserPlaylists(): Promise<SpotifyPlaylistSummary[]> {
 export async function fetchPlaylistTracks(
   playlistId: string,
 ): Promise<SpotifyPlaylistTrack[]> {
+  if (
+    playlistId === SPOTIFY_LIKED_SONGS_ID ||
+    playlistId === "liked" ||
+    playlistId === "liked-songs"
+  ) {
+    return fetchLikedTracks();
+  }
+
   const out: SpotifyPlaylistTrack[] = [];
   let path: string | null =
     `/playlists/${encodeURIComponent(playlistId)}/tracks?limit=100&fields=next,items(track(name,uri,duration_ms,artists(name)))`;

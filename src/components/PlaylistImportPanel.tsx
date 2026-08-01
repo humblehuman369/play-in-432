@@ -21,7 +21,9 @@ import {
   getSpotifyClientId,
   getSpotifyDashboardRedirectHints,
   getSpotifyRedirectUri,
+  hasSpotifyLibraryScope,
   isSpotifyConnected,
+  SPOTIFY_LIKED_SONGS_ID,
   spotifyTracksToQueries,
   type SpotifyPlaylistSummary,
   type SpotifyPlaylistTrack,
@@ -174,8 +176,11 @@ export function PlaylistImportPanel({
       try {
         const spTracks = await fetchPlaylistTracks(pl.id);
         if (!spTracks.length) {
+          const liked = pl.isLikedSongs || pl.id === SPOTIFY_LIKED_SONGS_ID;
           setStatus(
-            `“${pl.name}” returned no songs from Spotify (empty playlist or region-locked tracks).`,
+            liked
+              ? `Could not load Liked Songs. Disconnect Spotify and connect again so Spotify can grant “View your library” (user-library-read).`
+              : `“${pl.name}” returned no song titles from Spotify (empty playlist, private, or region-locked).`,
           );
           return;
         }
@@ -188,24 +193,42 @@ export function PlaylistImportPanel({
 
         if (!libraryCount) {
           setStatus(
-            `Showing ${spTracks.length} songs from “${pl.name}”. Spotify does not send audio — add matching files to your library, then tap Match again.`,
+            `Showing ${spTracks.length} song titles from “${pl.name}”. Spotify never sends audio — only names. Add matching MP3/WAV files under Library, then open this list again to match.`,
           );
           return;
         }
         await finishImport(pl.name, report!);
       } catch (e) {
         console.error(e);
-        onError?.(
+        const msg =
           e instanceof Error
             ? e.message
-            : "Failed to load Spotify playlist tracks.",
-        );
+            : "Failed to load Spotify playlist tracks.";
+        // 403 often means old token without user-library-read
+        if (/403|Insufficient|scope|library/i.test(msg)) {
+          onError?.(
+            `${msg} — Disconnect Spotify and Connect again to approve library access for Liked Songs.`,
+          );
+        } else {
+          onError?.(msg);
+        }
       } finally {
         setBusy(false);
       }
     },
     [tracks, finishImport, onError, libraryCount],
   );
+
+  const reconnectSpotify = useCallback(() => {
+    clearSpotifyTokens();
+    setSpotifyOk(false);
+    setSpotifyLists([]);
+    setPreview(null);
+    setStatus("Reconnect to grant Liked Songs / library access…");
+    void beginSpotifyLogin().catch((e) => {
+      onError?.(e instanceof Error ? e.message : "Spotify login failed");
+    });
+  }, [onError]);
 
   return (
     <section className="playlist-import card-block">
@@ -227,6 +250,16 @@ export function PlaylistImportPanel({
           </>
         )}
       </p>
+      {spotifyOk && !hasSpotifyLibraryScope() && (
+        <p className="playlist-import-hint playlist-import-warn" role="status">
+          Your Spotify connection is missing library access, so{" "}
+          <strong>Liked Songs</strong> may show 0 titles.{" "}
+          <button type="button" className="link-btn" onClick={reconnectSpotify}>
+            Disconnect & reconnect
+          </button>{" "}
+          and approve all permissions.
+        </p>
+      )}
 
       <div className="playlist-import-grid">
         {/* M3U */}
@@ -388,16 +421,27 @@ export function PlaylistImportPanel({
                     clearSpotifyTokens();
                     setSpotifyOk(false);
                     setSpotifyLists([]);
+                    setPreview(null);
                     setStatus("Disconnected from Spotify.");
                   }}
                 >
                   <LogOut size={14} /> Disconnect
                 </button>
+                <button
+                  type="button"
+                  className="btn sm"
+                  onClick={reconnectSpotify}
+                  title="Request latest permissions including Liked Songs"
+                >
+                  Reconnect
+                </button>
               </div>
               {libraryCount === 0 && (
                 <p className="playlist-import-hint playlist-import-warn">
-                  Your library is empty. Tap a playlist to see song titles, then
-                  add those files under Library so we can match and retune them.
+                  Your library is empty. Tap a Spotify list to preview{" "}
+                  <em>titles only</em>, then add those audio files under Library
+                  so we can match and retune them. Streaming audio is never
+                  downloaded.
                 </p>
               )}
               {spotifyLists.length > 0 ? (
@@ -410,9 +454,14 @@ export function PlaylistImportPanel({
                         disabled={busy}
                         onClick={() => void openSpotifyPlaylist(pl)}
                       >
-                        <span className="spotify-pl-name">{pl.name}</span>
+                        <span className="spotify-pl-name">
+                          {pl.isLikedSongs ? "♥ " : ""}
+                          {pl.name}
+                        </span>
                         <span className="spotify-pl-meta">
-                          {pl.trackCount} songs on Spotify
+                          {pl.trackCount < 0
+                            ? "needs reconnect"
+                            : `${pl.trackCount} titles on Spotify`}
                           {pl.owner ? ` · ${pl.owner}` : ""}
                           {libraryCount === 0
                             ? " · tap to preview titles"

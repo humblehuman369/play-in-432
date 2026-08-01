@@ -145,6 +145,7 @@
               refresh_token: data.refresh_token || "",
               expires_in: String(data.expires_in || 3600),
               token_type: data.token_type || "Bearer",
+              scope: data.scope || "",
             });
             var deep = ret.split("#")[0] + "#" + hash.toString();
 
