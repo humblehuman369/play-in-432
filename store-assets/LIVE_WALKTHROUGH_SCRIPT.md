@@ -1,5 +1,8 @@
 # Play In 432 — Live Website Walkthrough Script
 
+**Walkthrough video:** `store-assets/walkthrough-video/PlayIn432-Website-Walkthrough.mp4` (~51s, silent captions)
+
+
 **URL:** https://playin432.com/  
 **Audience:** investors, partners, creators, App Review-style demos, social live  
 **Length:** ~8–12 minutes (short version ~5 minutes)  

@@ -57,3 +57,10 @@ store-assets/**/*.xcarchive/
 store-assets/export/
 store-assets/**/dSYMs/
 store-assets/**/Products/
+
+# Walkthrough video intermediates (keep final MP4)
+store-assets/walkthrough-video/frames/
+store-assets/walkthrough-video/normalized/
+store-assets/walkthrough-video/captioned/
+store-assets/walkthrough-video/clips/
+store-assets/walkthrough-video/*.txt
