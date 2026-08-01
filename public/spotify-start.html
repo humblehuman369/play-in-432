@@ -43,6 +43,7 @@
           "playlist-read-private playlist-read-collaborative user-library-read";
         var REDIRECT = "https://playin432.com/spotify-callback.html";
         var STORE = "playin432_spotify_bridge_v1";
+        // Force consent every time so new scopes (library) are granted
 
         function b64url(buf) {
           var bytes = new Uint8Array(buf);
@@ -111,7 +112,14 @@
               state: state,
               code_challenge_method: "S256",
               code_challenge: challenge,
+              // Critical: without this, Spotify reuses the old grant and
+              // Liked Songs (user-library-read) never appears on the token.
+              show_dialog: "true",
             });
+            // Allow caller to force dialog (default on)
+            if (q.get("show_dialog") === "false") {
+              params.delete("show_dialog");
+            }
             location.replace(AUTH + "?" + params.toString());
           })
           .catch(function () {

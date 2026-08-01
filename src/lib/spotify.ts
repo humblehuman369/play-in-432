@@ -164,8 +164,15 @@ export function isSpotifyConnected(): boolean {
   return Boolean(t?.access_token);
 }
 
-/** Start PKCE authorization redirect. */
-export async function beginSpotifyLogin(): Promise<void> {
+/**
+ * Start PKCE authorization.
+ * Always requests library scope and forces the consent screen so reconnect
+ * actually upgrades old tokens (Spotify otherwise reuses the prior grant).
+ */
+export async function beginSpotifyLogin(opts?: {
+  /** Force Spotify to show the permission dialog (default true). */
+  forceConsent?: boolean;
+}): Promise<void> {
   const clientId = getSpotifyClientId();
   if (!clientId) {
     throw new Error(
@@ -173,14 +180,18 @@ export async function beginSpotifyLogin(): Promise<void> {
     );
   }
 
+  const forceConsent = opts?.forceConsent !== false;
+
   // Native: HTTPS bridge on playin432.com (PKCE in Safari sessionStorage),
   // then deep-link tokens back via playin432://oauth#…
-  // Avoids Spotify rejecting custom-scheme redirect_uri.
   if (isNativeApp()) {
     const { openExternalUrl } = await import("./native");
     const start = new URL(SPOTIFY_NATIVE_START_URL);
     start.searchParams.set("client_id", clientId);
     start.searchParams.set("return", `${APP_URL_SCHEME}://oauth`);
+    if (forceConsent) start.searchParams.set("show_dialog", "true");
+    // Cache-bust so Safari does not reuse a stale start page without library scope
+    start.searchParams.set("v", "2");
     await openExternalUrl(start.toString());
     return;
   }
@@ -192,7 +203,6 @@ export async function beginSpotifyLogin(): Promise<void> {
   const redirectUri = getSpotifyRedirectUri();
   localStorage.setItem(LS_VERIFIER, verifier);
   localStorage.setItem(LS_STATE, state);
-  // Token exchange must reuse the exact same redirect_uri string
   localStorage.setItem(LS_REDIRECT, redirectUri);
 
   const params = new URLSearchParams({
@@ -204,6 +214,7 @@ export async function beginSpotifyLogin(): Promise<void> {
     code_challenge_method: "S256",
     code_challenge: challenge,
   });
+  if (forceConsent) params.set("show_dialog", "true");
 
   window.location.assign(`${AUTH_URL}?${params.toString()}`);
 }
@@ -404,14 +415,38 @@ async function refreshIfNeeded(): Promise<string> {
   return t.access_token;
 }
 
+/** Normalize next-page URLs from Spotify into path+query for spotifyFetch. */
+function toApiPath(next: string | null | undefined): string | null {
+  if (!next) return null;
+  if (next.startsWith("http")) {
+    try {
+      const u = new URL(next);
+      return u.pathname.replace(/^\/v1/, "") + u.search;
+    } catch {
+      return next.replace(API, "").replace(/^https?:\/\/api\.spotify\.com\/v1/, "");
+    }
+  }
+  return next.startsWith("/") ? next : `/${next}`;
+}
+
 async function spotifyFetch<T>(path: string): Promise<T> {
   const token = await refreshIfNeeded();
-  const res = await fetch(`${API}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const apiPath = path.startsWith("http") ? toApiPath(path)! : path;
+  const res = await fetch(`${API}${apiPath.startsWith("/") ? apiPath : `/${apiPath}`}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
   });
   if (res.status === 401) {
     clearSpotifyTokens();
     throw new Error("Spotify session expired. Connect again.");
+  }
+  if (res.status === 403) {
+    const errText = await res.text();
+    throw new Error(
+      `Spotify permission denied (403). Disconnect and reconnect, approve all checkboxes including library access. ${errText.slice(0, 120)}`,
+    );
   }
   if (!res.ok) {
     const errText = await res.text();
@@ -452,29 +487,39 @@ type SpotifySavedTrackItem = {
   } | null;
 };
 
+function trackFromSpotifyObj(
+  t: {
+    name?: string;
+    uri?: string;
+    duration_ms?: number;
+    artists?: { name: string }[];
+  } | null | undefined,
+): SpotifyPlaylistTrack | null {
+  if (!t?.name) return null;
+  const artists = t.artists ?? [];
+  return {
+    title: t.name,
+    artist: artists.map((a) => a.name).join(", "),
+    durationMs: t.duration_ms ?? null,
+    spotifyUri: t.uri ?? null,
+  };
+}
+
 /** Liked Songs (saved tracks) — different endpoint from playlists. */
 export async function fetchLikedTracks(): Promise<SpotifyPlaylistTrack[]> {
   const out: SpotifyPlaylistTrack[] = [];
-  let path: string | null = "/me/tracks?limit=50";
+  let path: string | null = "/me/tracks?limit=50&market=from_token";
+  let pages = 0;
+  const maxPages = 40; // safety cap (~2000 titles)
 
-  while (path) {
-    const apiPath = path.startsWith("http") ? path.replace(API, "") : path;
-    const page: SpotifyPaging<SpotifySavedTrackItem> =
-      await spotifyFetch<SpotifyPaging<SpotifySavedTrackItem>>(apiPath);
-
-    for (const item of page.items) {
-      const t = item.track;
-      if (!t?.name) continue;
-      const artists = t.artists ?? [];
-      out.push({
-        title: t.name,
-        artist: artists.map((a: { name: string }) => a.name).join(", "),
-        durationMs: t.duration_ms ?? null,
-        spotifyUri: t.uri ?? null,
-      });
+  while (path && pages < maxPages) {
+    pages++;
+    const page = await spotifyFetch<SpotifyPaging<SpotifySavedTrackItem>>(path);
+    for (const item of page.items || []) {
+      const row = trackFromSpotifyObj(item.track);
+      if (row) out.push(row);
     }
-
-    path = page.next ? page.next.replace(API, "") : null;
+    path = toApiPath(page.next);
   }
 
   return out;
@@ -482,25 +527,26 @@ export async function fetchLikedTracks(): Promise<SpotifyPlaylistTrack[]> {
 
 async function fetchLikedSongsCount(): Promise<number> {
   try {
-    const page = await spotifyFetch<SpotifyPaging<SpotifySavedTrackItem> & { total?: number }>(
-      "/me/tracks?limit=1",
-    );
+    const page = await spotifyFetch<
+      SpotifyPaging<SpotifySavedTrackItem> & { total?: number }
+    >("/me/tracks?limit=1&market=from_token");
     return typeof page.total === "number" ? page.total : page.items?.length ?? 0;
   } catch (e) {
-    console.warn("[Spotify] Liked Songs count failed (reconnect for user-library-read?)", e);
-    return -1; // signal scope / permission issue
+    console.warn(
+      "[Spotify] Liked Songs count failed (reconnect for user-library-read?)",
+      e,
+    );
+    return -1;
   }
 }
 
 export async function fetchUserPlaylists(): Promise<SpotifyPlaylistSummary[]> {
   const out: SpotifyPlaylistSummary[] = [];
 
-  // Liked Songs first — not a normal playlist; needs user-library-read
   const likedCount = await fetchLikedSongsCount();
   out.push({
     id: SPOTIFY_LIKED_SONGS_ID,
     name: "Liked Songs",
-    // -1 = API denied (reconnect); otherwise Spotify's total
     trackCount: likedCount,
     imageUrl: null,
     owner: "You",
@@ -508,27 +554,26 @@ export async function fetchUserPlaylists(): Promise<SpotifyPlaylistSummary[]> {
   });
 
   let path: string | null = "/me/playlists?limit=50";
-
   while (path) {
-    const apiPath = path.startsWith("http") ? path.replace(API, "") : path;
-    const page: SpotifyPaging<SpotifyPlaylistItem> =
-      await spotifyFetch<SpotifyPaging<SpotifyPlaylistItem>>(apiPath);
-
-    for (const p of page.items) {
-      // Avoid duplicate if Spotify ever surfaces a similar name
+    const page = await spotifyFetch<SpotifyPaging<SpotifyPlaylistItem>>(path);
+    for (const p of page.items || []) {
       if (/^liked songs$/i.test(p.name) && out.some((x) => x.isLikedSongs)) {
         continue;
       }
+      const total =
+        typeof p.tracks?.total === "number"
+          ? p.tracks.total
+          : // Some responses omit tracks.total — still list the playlist
+            0;
       out.push({
         id: p.id,
         name: p.name,
-        trackCount: p.tracks?.total ?? 0,
+        trackCount: total,
         imageUrl: p.images?.[0]?.url ?? null,
         owner: p.owner?.display_name ?? "",
       });
     }
-
-    path = page.next ? page.next.replace(API, "") : null;
+    path = toApiPath(page.next);
   }
 
   return out;
@@ -546,30 +591,57 @@ export async function fetchPlaylistTracks(
   }
 
   const out: SpotifyPlaylistTrack[] = [];
+  // Do not use fields=… filters — they have broken track payloads for some users.
+  // market=from_token + additional_types helps return playable metadata.
   let path: string | null =
-    `/playlists/${encodeURIComponent(playlistId)}/tracks?limit=100&fields=next,items(track(name,uri,duration_ms,artists(name)))`;
+    `/playlists/${encodeURIComponent(playlistId)}/tracks?limit=100&market=from_token&additional_types=track`;
+  let pages = 0;
+  const maxPages = 40;
 
-  while (path) {
-    const apiPath = path.startsWith("http") ? path.replace(API, "") : path;
-    const page: SpotifyPaging<SpotifyTrackItem> =
-      await spotifyFetch<SpotifyPaging<SpotifyTrackItem>>(apiPath);
-
-    for (const item of page.items) {
-      const t = item.track;
-      if (!t?.name) continue;
-      const artists = t.artists ?? [];
-      out.push({
-        title: t.name,
-        artist: artists.map((a: { name: string }) => a.name).join(", "),
-        durationMs: t.duration_ms ?? null,
-        spotifyUri: t.uri ?? null,
-      });
+  while (path && pages < maxPages) {
+    pages++;
+    const page = await spotifyFetch<SpotifyPaging<SpotifyTrackItem>>(path);
+    for (const item of page.items || []) {
+      const row = trackFromSpotifyObj(item.track);
+      if (row) out.push(row);
     }
-
-    path = page.next ? page.next.replace(API, "") : null;
+    path = toApiPath(page.next);
   }
 
   return out;
+}
+
+/**
+ * Quick connectivity probe after login — surfaces scope / token problems.
+ */
+export async function probeSpotifyAccess(): Promise<{
+  ok: boolean;
+  displayName?: string;
+  likedCount: number;
+  playlistCount: number;
+  scopes: string;
+  error?: string;
+}> {
+  try {
+    const me = await spotifyFetch<{ display_name?: string; id?: string }>("/me");
+    const playlists = await fetchUserPlaylists();
+    const liked = playlists.find((p) => p.isLikedSongs);
+    return {
+      ok: true,
+      displayName: me.display_name || me.id,
+      likedCount: liked?.trackCount ?? -1,
+      playlistCount: playlists.filter((p) => !p.isLikedSongs).length,
+      scopes: loadSpotifyTokens()?.scope || "(scope not stored — reconnect)",
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      likedCount: -1,
+      playlistCount: 0,
+      scopes: loadSpotifyTokens()?.scope || "",
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
 }
 
 export function spotifyTracksToQueries(

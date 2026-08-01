@@ -23,6 +23,7 @@ import {
   getSpotifyRedirectUri,
   hasSpotifyLibraryScope,
   isSpotifyConnected,
+  probeSpotifyAccess,
   SPOTIFY_LIKED_SONGS_ID,
   spotifyTracksToQueries,
   type SpotifyPlaylistSummary,
@@ -134,9 +135,28 @@ export function PlaylistImportPanel({
     setSpotifyLoading(true);
     onError?.(null);
     try {
+      const probe = await probeSpotifyAccess();
+      if (!probe.ok) {
+        setSpotifyOk(false);
+        onError?.(
+          probe.error ||
+            "Spotify connected but API failed. Disconnect and reconnect.",
+        );
+        return;
+      }
+      // probe already loaded playlists via fetchUserPlaylists — fetch once more
+      // only for the list UI (cheap; keeps probe self-contained for diagnostics)
       const list = await fetchUserPlaylists();
       setSpotifyLists(list);
       setSpotifyOk(true);
+      const liked = list.find((p) => p.isLikedSongs);
+      const likedLabel =
+        liked && liked.trackCount >= 0
+          ? `${liked.trackCount} liked titles`
+          : "Liked Songs blocked — use Reconnect and approve library access";
+      setStatus(
+        `Connected as ${probe.displayName || "Spotify user"} · ${list.filter((p) => !p.isLikedSongs).length} playlists · ${likedLabel}. Tap a list to load song titles (audio is never streamed).`,
+      );
     } catch (e) {
       console.error(e);
       setSpotifyOk(false);
@@ -224,8 +244,10 @@ export function PlaylistImportPanel({
     setSpotifyOk(false);
     setSpotifyLists([]);
     setPreview(null);
-    setStatus("Reconnect to grant Liked Songs / library access…");
-    void beginSpotifyLogin().catch((e) => {
+    setStatus(
+      "Reconnecting — approve every permission, including access to your library / Liked Songs…",
+    );
+    void beginSpotifyLogin({ forceConsent: true }).catch((e) => {
       onError?.(e instanceof Error ? e.message : "Spotify login failed");
     });
   }, [onError]);
@@ -343,7 +365,7 @@ export function PlaylistImportPanel({
                 className="btn primary sm"
                 disabled={busy}
                 onClick={() => {
-                  void beginSpotifyLogin().catch((e) => {
+                  void beginSpotifyLogin({ forceConsent: true }).catch((e) => {
                     const msg =
                       e instanceof Error ? e.message : "Spotify login failed";
                     const redirect = getSpotifyRedirectUri();
