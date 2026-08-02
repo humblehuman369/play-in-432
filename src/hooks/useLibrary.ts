@@ -37,31 +37,50 @@ export function useLibrary() {
 
   const importFiles = useCallback(
     async (fileList: FileList | File[]) => {
-      const files = Array.from(fileList).filter(isAcceptedAudioFile);
+      const all = Array.from(fileList);
+      const files = all.filter(isAcceptedAudioFile);
+      const skipped = all.length - files.length;
       if (!files.length) {
-        setError("Please add audio files (MP3, WAV, M4A, FLAC, OGG).");
+        setError(
+          skipped
+            ? "That file is not audio. Please add MP3, WAV, M4A, FLAC, or OGG (not photos or video)."
+            : "Please add audio files (MP3, WAV, M4A, FLAC, OGG).",
+        );
         return [] as TrackMeta[];
       }
       setError(null);
       setImporting(true);
       try {
-        // Read ID3 tags before storing (files are re-materialized in db layer)
+        // Read ID3 tags before storing (files are re-materialized in db layer).
+        // Per-file try/catch so one bad file cannot crash the whole import (iPad camera/HEIC edge cases).
         const inputs: db.NewTrackInput[] = [];
         for (const file of files) {
-          const tags = await readMediaTags(file);
-          inputs.push({
-            file,
-            fileName: file.name,
-            name: tags.title || undefined,
-            artist: tags.artist,
-            album: tags.album,
-            artworkBlob: tags.artworkBlob,
-          });
+          try {
+            const tags = await readMediaTags(file);
+            inputs.push({
+              file,
+              fileName: file.name || "track.mp3",
+              name: tags.title || undefined,
+              artist: tags.artist,
+              album: tags.album,
+              artworkBlob: tags.artworkBlob,
+            });
+          } catch (e) {
+            console.warn("[useLibrary] skip file (tag read failed)", file.name, e);
+          }
+        }
+        if (!inputs.length) {
+          setError("Could not read those files as audio. Try another MP3 or WAV.");
+          return [] as TrackMeta[];
         }
         const created = await db.addTracksFromFiles(inputs);
         await refresh();
         if (!created.length) {
           setError("Import finished but no tracks were saved. Try again.");
+        } else if (skipped > 0) {
+          setError(
+            `Imported ${created.length} audio file(s). Skipped ${skipped} non-audio item(s).`,
+          );
         }
         return created;
       } catch (e) {

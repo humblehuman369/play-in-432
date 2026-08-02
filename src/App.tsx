@@ -478,7 +478,7 @@ function AppMain({
         <input
           ref={fileInputRef}
           type="file"
-          accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg,.webm,.aac"
+          accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg,.webm,.aac,audio/mpeg,audio/wav,audio/x-m4a,audio/flac"
           multiple
           hidden
           onChange={(e) => {
@@ -702,7 +702,7 @@ function AppMain({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg,.webm,.aac"
+                accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg,.webm,.aac,audio/mpeg,audio/wav,audio/x-m4a,audio/flac"
                 multiple
                 hidden
                 onChange={(e) => {
@@ -1416,7 +1416,7 @@ function AppMain({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg,.webm,.aac"
+                  accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg,.webm,.aac,audio/mpeg,audio/wav,audio/x-m4a,audio/flac"
                   multiple
                   hidden
                   onChange={(e) => {

@@ -194,8 +194,24 @@ export const ACCEPTED_MIME = [
 export const ACCEPTED_EXT = /\.(mp3|wav|m4a|aac|flac|ogg|webm)$/i;
 
 export function isAcceptedAudioFile(file: File): boolean {
-  if (ACCEPTED_MIME.includes(file.type)) return true;
-  return ACCEPTED_EXT.test(file.name);
+  const type = (file.type || "").toLowerCase();
+  // Reject photos/videos from iPad "Take Photo" / library pickers (crash risk + wrong media)
+  if (
+    type.startsWith("image/") ||
+    type.startsWith("video/") ||
+    type === "public.image" ||
+    type === "public.movie"
+  ) {
+    return false;
+  }
+  if (type && ACCEPTED_MIME.includes(type)) return true;
+  // Some WebViews leave type empty — fall back to extension
+  if (ACCEPTED_EXT.test(file.name || "")) return true;
+  // HEIC / camera dumps often lack a useful extension
+  if (/\.(heic|heif|jpg|jpeg|png|gif|webp|bmp|tiff?|mov|mp4|m4v)$/i.test(file.name || "")) {
+    return false;
+  }
+  return false;
 }
 
 /** Safe download filename stem from track name. */

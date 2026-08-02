@@ -49,6 +49,18 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!--
+	  WKWebView <input type="file"> on iPad may offer "Take Photo" even when
+	  accept=audio/*. Without these strings, iOS can terminate the app if the
+	  user taps Camera. The app does not use camera for product features;
+	  non-audio files are rejected in JavaScript.
+	-->
+	<key>NSCameraUsageDescription</key>
+	<string>Play In 432 only imports audio files for retuning. The system file picker on iPad may show Camera — please cancel and choose an audio file from Files instead. Camera access is not required to use the app.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Play In 432 only imports audio files. Photo library access is not required. Choose audio from the Files app if the system picker appears.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Play In 432 does not record audio. Microphone access is not required for playback or retune.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
