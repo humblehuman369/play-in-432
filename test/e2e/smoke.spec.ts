@@ -17,6 +17,12 @@ test("import a track and reach the HQ export control", async ({ page }) => {
   await expect(openPlayer).toBeVisible();
   await openPlayer.click();
 
+  // UX-2 empty state: how-it-works shown, secondary controls collapsed.
+  await expect(page.getByText(/how it works/i)).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: /target frequency anchors/i }),
+  ).toHaveCount(0);
+
   // Import the fixture MP3 via the Library tab's file input.
   await page.getByRole("tab", { name: /library/i }).click();
   await page.locator('input[type="file"]').first().setInputFiles(FIXTURE);
@@ -30,7 +36,7 @@ test("import a track and reach the HQ export control", async ({ page }) => {
   // Retune target control is present on the player.
   await page.getByRole("tab", { name: /player/i }).click();
   await expect(
-    page.getByRole("listbox", { name: /target frequency anchors/i }),
+    page.getByRole("group", { name: /target frequency anchors/i }),
   ).toBeVisible();
 
   // HQ export button is reachable and enabled now that a track is active.

@@ -1849,6 +1849,56 @@ input[type="range"]:disabled {
   word-break: break-word;
 }
 
+/* UX-2 empty-state player */
+.how-it-works {
+  max-width: 34ch;
+  margin-left: auto;
+  margin-right: auto;
+  opacity: 0.85;
+}
+
+/* UX-1 playlist keyboard reorder controls */
+.reorder-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.reorder-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 0;
+}
+
+.reorder-btn:hover:not(:disabled) {
+  color: var(--text, #fff);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.reorder-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Contrast/motion (UX): honor reduced-motion for glow/waveform/pulse/spin */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -3286,9 +3336,102 @@ input[type="range"]:disabled {
   line-height: 1.5;
 }
 
+/* UX-3: two side-by-side plan cards inside the upgrade gate */
+.upgrade-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin: 0 0 0.9rem;
+  text-align: left;
+}
+
+@media (max-width: 460px) {
+  .upgrade-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.upgrade-card {
+  position: relative;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.14));
+  border-radius: 12px;
+  padding: 0.85rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.upgrade-card-pro {
+  border-color: var(--accent, #00d4aa);
+  box-shadow: 0 0 0 1px var(--accent, #00d4aa) inset;
+}
+
+.upgrade-card-badge {
+  position: absolute;
+  top: -0.6rem;
+  right: 0.6rem;
+  background: var(--accent, #00d4aa);
+  color: #072018;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.upgrade-card h3 {
+  margin: 0 0 0.15rem;
+  font-size: 0.98rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.upgrade-card-price {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.upgrade-card-price span {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.upgrade-card-features {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  font-size: 0.76rem;
+  flex: 1;
+}
+
+.upgrade-card-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.3rem;
+  line-height: 1.3;
+}
+
+.upgrade-card-features svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--accent, #00d4aa);
+}
+
 .upgrade-modal .btn {
   width: 100%;
   margin-bottom: 0.5rem;
+}
+
+.upgrade-card .btn {
+  margin-bottom: 0;
+  margin-top: auto;
 }
 
 .upgrade-restore {

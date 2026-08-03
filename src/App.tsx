@@ -640,7 +640,7 @@ function AppMain({
           busy={pro.checkoutBusy}
           error={pro.checkoutError}
           onClose={() => setUpgradeOpen(false)}
-          onUpgrade={() => void pro.upgrade({ tier: "pro" })}
+          onUpgrade={(tier) => void pro.upgrade({ tier })}
           onRestoreAccess={(input) => pro.restoreAccess(input)}
           onRestoreStore={() => void pro.restore()}
           nativeBilling={pro.nativeBilling}
@@ -830,8 +830,16 @@ function AppMain({
                   {lib.tracks.length === 1 ? "" : "s"}
                 </p>
               )}
+              {lib.tracks.length === 0 && !lib.importing && (
+                <p className="drop-hint how-it-works">
+                  How it works: add a track → tap 432 (or another target) →
+                  listen live, or Download HQ.
+                </p>
+              )}
             </section>
 
+            {lib.tracks.length > 0 && (
+            <>
             <section className="player-card">
               <div className="now-playing">
                 <div className={`art ${player.playing ? "pulse" : ""}`}>
@@ -1318,6 +1326,8 @@ function AppMain({
                 requestTargetHz(hz);
               }}
             />
+            </>
+            )}
 
             <section className="playlist-card">
               <div className="playlist-head">
@@ -1911,7 +1921,7 @@ function AppMain({
         busy={pro.checkoutBusy}
         error={pro.checkoutError}
         onClose={() => setUpgradeOpen(false)}
-        onUpgrade={() => void pro.upgrade({ tier: "pro" })}
+        onUpgrade={(tier) => void pro.upgrade({ tier })}
         onRestoreAccess={(input) => pro.restoreAccess(input)}
         onRestoreStore={() => void pro.restore()}
         nativeBilling={pro.nativeBilling}

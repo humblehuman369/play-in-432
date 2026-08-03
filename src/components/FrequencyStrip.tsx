@@ -93,7 +93,7 @@ export function FrequencyStrip({
 
       <div
         className="freq-strip"
-        role="listbox"
+        role="group"
         aria-label="Target frequency anchors"
       >
         {FREQUENCY_ANCHORS.map((a) => {
@@ -104,8 +104,12 @@ export function FrequencyStrip({
             <button
               key={a.hz}
               type="button"
-              role="option"
-              aria-selected={on}
+              aria-pressed={on}
+              aria-label={
+                locked
+                  ? `${a.name}, ${a.label} — TrueHz Pro`
+                  : `${a.name}, ${a.label}`
+              }
               className={`freq-chip ${on ? "on" : ""} ${a.featured ? "featured" : ""} ${locked ? "locked" : ""}`}
               onClick={() => onSelect(a)}
               title={

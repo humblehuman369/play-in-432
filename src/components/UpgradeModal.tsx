@@ -1,6 +1,12 @@
 import { useState } from "react";
-import { Crown, Loader2, X } from "lucide-react";
-import { FREE_HQ_EXPORT_LIMIT, PRO_PRICE_LABEL } from "../lib/pro";
+import { Check, Crown, Loader2, Sparkles, X } from "lucide-react";
+import {
+  FREE_HQ_EXPORT_LIMIT,
+  LITE_FEATURES,
+  LITE_PRICE_LABEL,
+  PRO_FEATURES,
+  PRO_PRICE_LABEL,
+} from "../lib/pro";
 import { BRAND } from "../lib/brand";
 
 export type UpgradeReason = "frequency" | "export" | "general";
@@ -11,7 +17,8 @@ type Props = {
   busy?: boolean;
   error?: string | null;
   onClose: () => void;
-  onUpgrade: () => void;
+  /** Start checkout for the chosen tier. */
+  onUpgrade: (tier: "lite" | "pro") => void;
   onRestoreAccess?: (input: {
     email?: string;
     sessionId?: string;
@@ -22,16 +29,16 @@ type Props = {
 
 const COPY: Record<UpgradeReason, { title: string; body: string }> = {
   frequency: {
-    title: "This target is a Pro feature",
-    body: "Free includes A=432 and A=440. TrueHz Pro unlocks every Solfeggio and custom concert reference — one-time, no subscription.",
+    title: "This target needs Lite or Pro",
+    body: "Free includes A=432 and A=440. Unlock every Solfeggio and custom concert reference — one-time, no subscription.",
   },
   export: {
     title: "HQ export limit reached",
-    body: `Free includes ${FREE_HQ_EXPORT_LIMIT} TrueHz Convert HQ downloads (WAV or MP3). Pro unlocks unlimited high-quality exports.`,
+    body: `Free includes ${FREE_HQ_EXPORT_LIMIT} TrueHz Convert HQ downloads (WAV or MP3). Lite adds a monthly allowance; Pro is unlimited.`,
   },
   general: {
-    title: "TrueHz Pro",
-    body: `All frequency targets + unlimited ${BRAND.convertProduct} HQ export for ${PRO_PRICE_LABEL} once.`,
+    title: "Unlock TrueHz",
+    body: `All frequency targets + more ${BRAND.convertProduct} HQ export. One-time, no subscription.`,
   },
 };
 
@@ -84,22 +91,67 @@ export function UpgradeModal({
         </div>
         <h2 id="upgrade-title">{c.title}</h2>
         <p>{c.body}</p>
-        <button
-          type="button"
-          className="btn primary lg"
-          onClick={onUpgrade}
-          disabled={busy}
-        >
-          {busy ? (
-            <>
-              <Loader2 size={18} className="spin" /> Opening checkout…
-            </>
-          ) : (
-            <>
-              <Crown size={18} /> Unlock Pro — {PRO_PRICE_LABEL}
-            </>
-          )}
-        </button>
+
+        <div className="upgrade-cards" role="group" aria-label="Choose a plan">
+          {/* Lite */}
+          <div className="upgrade-card">
+            <h3>TrueHz Lite</h3>
+            <p className="upgrade-card-price">
+              {LITE_PRICE_LABEL} <span>one-time</span>
+            </p>
+            <ul className="upgrade-card-features">
+              {LITE_FEATURES.map((f) => (
+                <li key={f}>
+                  <Check size={13} aria-hidden /> {f}
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={() => onUpgrade("lite")}
+              disabled={busy}
+            >
+              {busy ? (
+                <Loader2 size={16} className="spin" aria-hidden />
+              ) : (
+                <Sparkles size={16} aria-hidden />
+              )}
+              Unlock Lite — {LITE_PRICE_LABEL}
+            </button>
+          </div>
+
+          {/* Pro — pre-highlighted */}
+          <div className="upgrade-card upgrade-card-pro" aria-label="Best value">
+            <div className="upgrade-card-badge">Best value</div>
+            <h3>
+              <Crown size={16} aria-hidden /> TrueHz Pro
+            </h3>
+            <p className="upgrade-card-price">
+              {nativeBilling ? "$19.99" : PRO_PRICE_LABEL} <span>one-time</span>
+            </p>
+            <ul className="upgrade-card-features">
+              {PRO_FEATURES.map((f) => (
+                <li key={f}>
+                  <Check size={13} aria-hidden /> {f}
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => onUpgrade("pro")}
+              disabled={busy}
+            >
+              {busy ? (
+                <Loader2 size={16} className="spin" aria-hidden />
+              ) : (
+                <Crown size={16} aria-hidden />
+              )}
+              Unlock Pro — {nativeBilling ? "$19.99" : PRO_PRICE_LABEL}
+            </button>
+          </div>
+        </div>
 
         <button
           type="button"
@@ -107,7 +159,7 @@ export function UpgradeModal({
           onClick={() => setShowRestore((v) => !v)}
           disabled={busy}
         >
-          Already paid? Restore Pro
+          Already paid? Restore access
         </button>
 
         {showRestore && (
@@ -122,14 +174,16 @@ export function UpgradeModal({
               onChange={(e) => setEmail(e.target.value)}
               disabled={busy}
               className="upgrade-restore-input"
+              aria-label="Receipt email"
             />
             <input
               type="text"
-              placeholder="Or cs_live_… session id"
+              placeholder="Or cs_live_… unlock code"
               value={sessionId}
               onChange={(e) => setSessionId(e.target.value)}
               disabled={busy}
               className="upgrade-restore-input"
+              aria-label="Unlock code"
             />
             <button
               type="button"
@@ -139,10 +193,10 @@ export function UpgradeModal({
             >
               {busy ? (
                 <>
-                  <Loader2 size={16} className="spin" /> Restoring…
+                  <Loader2 size={16} className="spin" aria-hidden /> Restoring…
                 </>
               ) : (
-                "Restore Pro"
+                "Restore access"
               )}
             </button>
             {nativeBilling && onRestoreStore && (

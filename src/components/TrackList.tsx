@@ -1,4 +1,6 @@
 import {
+  ChevronDown,
+  ChevronUp,
   GripVertical,
   Heart,
   ListPlus,
@@ -95,8 +97,32 @@ export function TrackList({
             onDragEnd={() => setDragIndex(null)}
           >
             {onReorder && (
-              <span className="drag-handle" title="Drag to reorder">
-                <GripVertical size={14} />
+              <span className="reorder-controls">
+                <span
+                  className="drag-handle"
+                  title="Drag to reorder"
+                  aria-hidden
+                >
+                  <GripVertical size={14} />
+                </span>
+                <button
+                  type="button"
+                  className="reorder-btn"
+                  onClick={() => onReorder(i, i - 1)}
+                  disabled={i === 0}
+                  aria-label={`Move ${t.name} up`}
+                >
+                  <ChevronUp size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="reorder-btn"
+                  onClick={() => onReorder(i, i + 1)}
+                  disabled={i === tracks.length - 1}
+                  aria-label={`Move ${t.name} down`}
+                >
+                  <ChevronDown size={14} />
+                </button>
               </span>
             )}
             <button
