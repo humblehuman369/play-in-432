@@ -6,6 +6,7 @@
  *      APP_URL (optional production origin override)
  */
 import Stripe from "stripe";
+import { setCors } from "./_lib/cors.js";
 
 const TIERS = {
   pro: {
@@ -24,12 +25,6 @@ const TIERS = {
   },
 };
 
-function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-}
-
 function originFromReq(req) {
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
   const proto = req.headers["x-forwarded-proto"] || "https";
@@ -41,7 +36,7 @@ function originFromReq(req) {
 }
 
 export default async function handler(req, res) {
-  setCors(res);
+  setCors(req, res);
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();

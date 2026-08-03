@@ -5,107 +5,21 @@
  * api/send-gift-email.js relay, which is removed) so there is no
  * unauthenticated public email endpoint. The gift email is sent at most
  * once per session, guarded by a `gift_email_sent` flag written back to the
- * Stripe session metadata.
+ * Stripe session metadata. The buyer's own unlock email is sent by
+ * api/stripe-webhook.js (durable path); this endpoint returns the buyer
+ * email so the success screen can show where it was sent.
  *
  * Env: STRIPE_SECRET_KEY (required)
  *      RESEND_API_KEY (optional — gift email only sent when present)
  *      GIFT_FROM_EMAIL (optional sender, e.g. gifts@playin432.com)
- *      APP_URL (optional production origin override)
  */
 import Stripe from "stripe";
-
-function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-}
-
-/** HTML-escape untrusted text before interpolating into email markup. */
-function esc(input) {
-  return String(input ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-/**
- * Tier is authoritative from session metadata (set when we create the
- * session). No amount-total sniffing — coupons/proration must never
- * downgrade a tier. If metadata is somehow absent, default to "pro" and
- * warn (should not happen for sessions we create).
- */
-function tierFromSession(session) {
-  const meta = session.metadata || {};
-  if (meta.tier === "lite" || meta.product === "truehz_lite") return "lite";
-  if (meta.tier === "pro" || meta.product === "truehz_pro") return "pro";
-  console.warn(
-    "tierFromSession: no tier/product metadata on session",
-    session.id,
-  );
-  return "pro";
-}
-
-/** Send the gift redemption email via Resend. Returns true on success. */
-async function sendGiftEmail({ to, tier, giftCode, fromName }) {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (!apiKey) return false;
-
-  const from =
-    process.env.GIFT_FROM_EMAIL?.trim() ||
-    "Play In 432 <onboarding@resend.dev>";
-  const tierLabel = tier === "lite" ? "TrueHz Lite" : "TrueHz Pro";
-  const safeName = esc(String(fromName || "Someone").trim().slice(0, 80));
-  const safeCode = esc(giftCode);
-  const redeemUrl = `https://playin432.com/?redeem=${encodeURIComponent(
-    giftCode,
-  )}`;
-  const safeRedeemUrl = esc(redeemUrl);
-
-  const html = `
-    <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;color:#0a1218">
-      <h1 style="font-size:20px">You've received ${esc(tierLabel)}</h1>
-      <p>${safeName} sent you a gift for <strong>Play In 432</strong> — retune your music with TrueHz™.</p>
-      <p><strong>No account required.</strong> Open the link below (or paste the code in the app under Restore purchase / redeem gift):</p>
-      <p style="margin:24px 0">
-        <a href="${safeRedeemUrl}"
-           style="background:#00d4aa;color:#072018;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:600">
-          Redeem ${esc(tierLabel)}
-        </a>
-      </p>
-      <p style="font-size:13px;color:#445">Gift code:</p>
-      <code style="display:block;padding:10px;background:#f0f4f3;border-radius:8px;word-break:break-all">${safeCode}</code>
-      <p style="font-size:13px;color:#445;margin-top:24px">
-        Or visit <a href="https://playin432.com/">playin432.com</a> → Pricing → Restore purchase / redeem gift.
-      </p>
-    </div>
-  `;
-
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject: `Your Play In 432 gift — ${tierLabel}`,
-      html,
-    }),
-  });
-
-  if (!r.ok) {
-    const errText = await r.text();
-    console.error("resend", r.status, errText);
-    return false;
-  }
-  return true;
-}
+import { setCors } from "./_lib/cors.js";
+import { sendGiftEmail } from "./_lib/email.js";
+import { tierFromSession } from "./_lib/tier.js";
 
 export default async function handler(req, res) {
-  setCors(res);
+  setCors(req, res);
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
@@ -196,6 +110,7 @@ export default async function handler(req, res) {
       tier,
       gift,
       giftCode,
+      email: session.customer_details?.email || null,
       emailed: emailed || alreadySent,
     });
   } catch (err) {

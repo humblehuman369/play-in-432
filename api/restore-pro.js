@@ -8,12 +8,7 @@
  * Env: STRIPE_SECRET_KEY
  */
 import Stripe from "stripe";
-
-function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-}
+import { setCors } from "./_lib/cors.js";
 
 function tierFromSession(session) {
   const meta = session.metadata || {};
@@ -104,7 +99,7 @@ async function findByEmail(stripe, rawEmail) {
 }
 
 export default async function handler(req, res) {
-  setCors(res);
+  setCors(req, res);
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();

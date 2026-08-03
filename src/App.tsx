@@ -167,6 +167,14 @@ function AppMain({
   const [upgradeReason, setUpgradeReason] =
     useState<UpgradeReason>("general");
   const [proToast, setProToast] = useState<string | null>(null);
+  // UX-6: post-purchase unlock screen (non-gift). Holds the unlock code +
+  // the email it was sent to; null when hidden.
+  const [unlockInfo, setUnlockInfo] = useState<{
+    code: string | null;
+    email: string | null;
+    tier: string;
+  } | null>(null);
+  const [unlockCopied, setUnlockCopied] = useState(false);
 
   const openUpgrade = useCallback((reason: UpgradeReason = "general") => {
     setUpgradeReason(reason);
@@ -249,17 +257,20 @@ function AppMain({
 
       const result = await handleCheckoutReturn(window.location.search);
       if (cancelled) return;
-      if (result === "activated") {
-        setProToast(
-          "Purchase unlocked on this device. Your library stays local — re-import only if you left during checkout.",
-        );
+      if (typeof result === "object" && result.kind === "activated") {
+        setUnlockCopied(false);
+        setUnlockInfo({
+          code: result.code,
+          email: result.email,
+          tier: result.tier,
+        });
         pro.refresh();
         stripCheckoutParams();
         enterApp("player");
         void lib.refresh();
       } else if (typeof result === "object" && result.kind === "gift") {
         setProToast(
-          `Gift code (${result.tier.toUpperCase()}): ${result.code} — copy & send, or we email them if they entered a recipient on Stripe. They open the link or use Restore / redeem gift.`,
+          `Gift unlock code (${result.tier.toUpperCase()}): ${result.code} — copy & send, or we email them if they entered a recipient on Stripe. They open the link or use Restore / redeem gift.`,
         );
         stripCheckoutParams();
         enterApp("player");
@@ -471,6 +482,60 @@ function AppMain({
 
   const openFilePicker = () => fileInputRef.current?.click();
 
+  const copyUnlockCode = async () => {
+    if (!unlockInfo?.code) return;
+    try {
+      await navigator.clipboard.writeText(unlockInfo.code);
+      setUnlockCopied(true);
+    } catch {
+      setUnlockCopied(false);
+    }
+  };
+
+  // UX-6: shown once after a non-gift purchase, in whichever shell is active.
+  const unlockModal = unlockInfo ? (
+    <Modal
+      title="You're unlocked"
+      onClose={() => setUnlockInfo(null)}
+      footer={
+        <button
+          type="button"
+          className="btn primary"
+          onClick={() => setUnlockInfo(null)}
+        >
+          Done
+        </button>
+      }
+    >
+      <p>
+        <strong>{unlockInfo.tier === "lite" ? "TrueHz Lite" : "TrueHz Pro"}</strong>{" "}
+        is active on this device. This code is your license — save it to restore
+        on any device.
+      </p>
+      {unlockInfo.email && (
+        <p>
+          We’ve emailed your unlock code to <strong>{unlockInfo.email}</strong>.
+        </p>
+      )}
+      {unlockInfo.code && (
+        <div className="unlock-code-row">
+          <code className="unlock-code">{unlockInfo.code}</code>
+          <button
+            type="button"
+            className="btn sm"
+            onClick={() => void copyUnlockCode()}
+          >
+            {unlockCopied ? "Copied" : "Copy"}
+          </button>
+        </div>
+      )}
+      <p className="unlock-hint">
+        To restore later: Pricing → Restore purchase, then paste this code or the
+        email you paid with.
+      </p>
+    </Modal>
+  ) : null;
+
   if (shell === "landing") {
     return (
       <div className="app landing-mode">
@@ -552,6 +617,7 @@ function AppMain({
             </button>
           </div>
         )}
+        {unlockModal}
       </div>
     );
   }
@@ -1821,6 +1887,7 @@ function AppMain({
           </button>
         </div>
       )}
+      {unlockModal}
     </div>
   );
 }

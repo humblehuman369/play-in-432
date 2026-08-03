@@ -607,9 +607,16 @@ export async function restoreProAccess(
   };
 }
 
-export async function verifyCheckoutSession(
-  sessionId: string,
-): Promise<{ ok: boolean; error?: string; tier?: TierId; giftCode?: string }> {
+export async function verifyCheckoutSession(sessionId: string): Promise<{
+  ok: boolean;
+  error?: string;
+  tier?: TierId;
+  giftCode?: string;
+  /** Unlock code (Stripe session id) for a non-gift purchase. */
+  code?: string;
+  /** Buyer email the unlock code was emailed to (non-gift). */
+  email?: string | null;
+}> {
   const res = await fetch(apiUrl("/api/verify-checkout-session"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -629,6 +636,7 @@ export async function verifyCheckoutSession(
     tier?: string;
     gift?: boolean;
     giftCode?: string;
+    email?: string | null;
   };
 
   if (data.paid && data.sessionId) {
@@ -642,7 +650,7 @@ export async function verifyCheckoutSession(
       };
     }
     activateTier(tier, data.sessionId);
-    return { ok: true, tier };
+    return { ok: true, tier, code: data.sessionId, email: data.email ?? null };
   }
   return { ok: false, error: "Payment not completed." };
 }
@@ -650,11 +658,10 @@ export async function verifyCheckoutSession(
 export async function handleCheckoutReturn(
   search: string,
 ): Promise<
-  | "activated"
-  | "gift"
   | "cancel"
   | "none"
   | "error"
+  | { kind: "activated"; code: string | null; email: string | null; tier: TierId }
   | { kind: "gift"; code: string; tier: TierId }
 > {
   const params = new URLSearchParams(search);
@@ -667,7 +674,7 @@ export async function handleCheckoutReturn(
   if (!sessionId) {
     if (import.meta.env.VITE_STRIPE_TRUST_SUCCESS_PARAM === "1") {
       activatePro(`link_${Date.now()}`);
-      return "activated";
+      return { kind: "activated", code: null, email: null, tier: "pro" };
     }
     return "error";
   }
@@ -681,7 +688,12 @@ export async function handleCheckoutReturn(
       tier: result.tier || "pro",
     };
   }
-  return "activated";
+  return {
+    kind: "activated",
+    code: result.code ?? null,
+    email: result.email ?? null,
+    tier: result.tier || "pro",
+  };
 }
 
 export function stripCheckoutParams() {

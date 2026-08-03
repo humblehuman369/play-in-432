@@ -56,7 +56,7 @@ export function PricingSection({
       return;
     }
     if (!email && !code) {
-      setLocalMsg("Enter your Stripe receipt email or a gift/session code.");
+      setLocalMsg("Enter your Stripe receipt email or your unlock code.");
       return;
     }
     const ok = await onRestoreAccess({
@@ -185,7 +185,7 @@ export function PricingSection({
         <div className="pricing-gift-copy">
           <strong>Buy as a gift</strong>
           <p>
-            Purchase Lite or Pro for someone else. You’ll get a redeem code to
+            Purchase Lite or Pro for someone else. You’ll get an unlock code to
             share — they activate it here with no account.
           </p>
         </div>
@@ -232,8 +232,8 @@ export function PricingSection({
       {showRestore && (
         <div className="pricing-restore-panel">
           <p>
-            Use the <strong>email</strong> from your Stripe receipt, or paste a{" "}
-            <strong>gift / session code</strong> (starts with <code>cs_</code>).
+            Use the <strong>email</strong> from your Stripe receipt, or paste your{" "}
+            <strong>unlock code</strong> (starts with <code>cs_</code>).
           </p>
           <label>
             Email
@@ -246,12 +246,12 @@ export function PricingSection({
             />
           </label>
           <label>
-            Gift / session code
+            Unlock code
             <input
               type="text"
               value={restoreCode}
               onChange={(e) => setRestoreCode(e.target.value)}
-              placeholder="cs_live_… or gift code"
+              placeholder="cs_live_… (your unlock code)"
               autoComplete="off"
             />
           </label>
@@ -290,7 +290,7 @@ export function PricingSection({
       <p className="pricing-footnote">
         No Play In 432 account required. Web purchases unlock this browser;
         App Store purchases restore via Apple. Cross-device: use the same Stripe
-        email or gift code on each device.
+        email or unlock code on each device.
       </p>
     </section>
   );
