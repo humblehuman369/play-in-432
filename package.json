@@ -8,6 +8,10 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "guard:server-only": "node scripts/check-server-only.mjs",
     "mobile:sync": "npm run build && npx cap sync",
     "mobile:ios": "npm run mobile:sync && npx cap open ios",
     "mobile:android": "npm run mobile:sync && npx cap open android",
@@ -38,6 +42,7 @@
     "@capacitor/android": "^8.4.2",
     "@capacitor/cli": "^8.4.2",
     "@capacitor/ios": "^8.4.2",
+    "@playwright/test": "^1.62.1",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
@@ -45,6 +50,7 @@
     "oxlint": "^1.71.0",
     "playwright": "^1.49.0",
     "typescript": "~6.0.2",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "vitest": "^4.1.10"
   }
 }

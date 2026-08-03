@@ -1,5 +1,7 @@
 # Play In 432
 
+![CI](https://github.com/humblehuman369/play-in-432/actions/workflows/ci.yml/badge.svg)
+
 **Play In 432** — your music, retuned for 432 listening.  
 **Powered by TrueHz™ technology.**
 
@@ -50,7 +52,7 @@ Files never leave your device.
 ## Run
 
 ```bash
-cd truehz-player   # local folder name
+cd play-in-432   # local folder name
 npm install
 npm run dev
 ```
@@ -62,7 +64,7 @@ Open the URL Vite prints (usually `http://127.0.0.1:5173/` for Spotify).
 This is a static Vite app (`dist/`). Config is in `vercel.json`.
 
 ```bash
-cd truehz-player
+cd play-in-432
 npm i -g vercel   # if needed
 vercel login
 vercel            # first deploy (preview)
@@ -83,13 +85,13 @@ Or: push this repo to GitHub → [vercel.com/new](https://vercel.com/new) → im
 
 Music stays in the **user’s browser IndexedDB** — Vercel only hosts the app files (+ Stripe API routes).
 
-### TrueHz Pro · Stripe ($19 one-time)
+### Tiers · Stripe (one-time)
 
-| Free forever | TrueHz Pro |
-|--------------|------------|
-| Live A=440 → A=432 | All Solfeggio / custom targets |
-| Library, playlists, Learn | Unlimited HQ WAV (TrueHz Convert) |
-| 3 HQ exports | One-time payment, no subscription |
+| Free forever | TrueHz Lite ($9.99) | TrueHz Pro ($19) |
+|--------------|---------------------|------------------|
+| Live A=440 → A=432 | All Solfeggio / custom targets | Everything in Lite |
+| Library, playlists, Learn | 10 HQ exports / month (TrueHz Convert) | Unlimited HQ WAV + batch export |
+| 3 HQ exports (lifetime) | One-time payment, no subscription | One-time payment, no subscription |
 
 **Vercel env (Production + Preview):**
 
@@ -184,3 +186,6 @@ Rubber Band Library is GPLv2; commercial closed-source distribution may require 
 - `npm run dev` — local dev server  
 - `npm run build` — production build  
 - `npm run preview` — serve build  
+- `npm test` — unit tests (vitest)  
+- `npm run test:e2e` — Playwright smoke (builds + serves preview)  
+- `npm run guard:server-only` — fail if `src/` imports the server-only `stripe` SDK  
