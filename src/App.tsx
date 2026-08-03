@@ -1123,7 +1123,7 @@ function AppMain({
                   </div>
                   <p className="export-status">
                     {player.exportStatus ??
-                      `${BRAND.convertProduct} · Rubber Band HQ`}
+                      `${BRAND.convertProduct} · HQ`}
                     {player.settings.bedOn
                       ? ` · + ${BRAND.bedLabel}`
                       : ""}
@@ -1336,7 +1336,7 @@ function AppMain({
                 </li>
                 <li>
                   <strong>{BRAND.downloadHqLabel}</strong> uses the{" "}
-                  <strong>{BRAND.convertProduct}</strong> engine (Rubber Band)
+                  <strong>{BRAND.convertProduct}</strong> engine
                   for high-quality offline WAV or MP3. Live listening stays fast
                   (SoundTouch). Same ratio math either way.
                 </li>

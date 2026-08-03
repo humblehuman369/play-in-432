@@ -40,7 +40,7 @@ export const BRAND = {
   downloadHqLabel: "Download HQ",
   /** Download button subtitle / title */
   downloadHqTitle:
-    "TrueHz Convert · Rubber Band high-quality offline export (WAV or MP3)",
+    "TrueHz Convert · high-quality offline export (WAV or MP3)",
   /** Progress label while exporting */
   downloadHqProgress: "TrueHz Convert",
 } as const;
