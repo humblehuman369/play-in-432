@@ -1,10 +1,40 @@
-# App Store Submit Checklist — Play In 432 1.0
+# App Store Submit Checklist — Play In 432 1.0 (Build 9)
 
-**As of:** 2026-08-02  
-**App ID:** 6792840657  
+**As of:** 2026-08-03
+**App ID:** 6792840657
 **Bundle:** `com.playin432.app`
+**Web at:** commit `721c5ef` (all synced into native via `npx cap sync`)
 
-## Automated (done by tooling)
+## What changed since build 8
+
+7 commits shipped to web/production since build 8; all are now synced into
+the native app:
+
+- **Security** — closed the public gift-email relay, generic API error
+  responses, added security headers, metadata-authoritative purchase tiers
+  (coupons can't downgrade a tier). *(SEC-1/2/3/5, CODE-5)*
+- **Durable purchases** — Stripe webhook emails the buyer their unlock code
+  even if they close the tab before the success screen; new post-purchase
+  "You're unlocked" screen with copyable code; CORS locked to an allowlist.
+  *(CODE-4, UX-5/6, SEC-4)*
+- **Library storage overhaul** — IndexedDB schema **v2**: audio/artwork split
+  out of the metadata store, with a one-time migration on first launch. Much
+  lower memory on large libraries; playing a track no longer rewrites its
+  audio. *(CODE-2/3)* ⚠️ **First launch of build 9 migrates each user's
+  existing library — irreversible per device.**
+- **Import polish** — cleaner track names (strips `_<hex>` suffixes), warns on
+  exact duplicate imports. *(UX-4)*
+- **Front-of-house** — two-card Lite/Pro upgrade screen, empty-state player,
+  accessibility (aria-labels, keyboard playlist reorder, reduced-motion). *(UX-1/2/3)*
+- **Spotify card** no longer shows developer setup text to end users.
+
+## Native version this pass
+
+- iOS `CURRENT_PROJECT_VERSION` = **9** · `MARKETING_VERSION` = **1.0.0**
+- Android `versionCode` = **9** · `versionName` = **1.0.0**
+- Web assets synced into `ios/App/App/public` and android assets.
+
+## Carried over from build 8 (verify still true)
 
 | Item | Status |
 |------|--------|
@@ -13,50 +43,58 @@
 | RevenueCat iOS public key in `.env` | Set |
 | ASC IAP Lite `com.playin432.app.truehz_lite` | READY_TO_SUBMIT |
 | ASC IAP Pro `com.playin432.app.truehz_pro` | READY_TO_SUBMIT |
-| Build **8** uploaded | VALID |
-| Build **8** attached to iOS **1.0** | Yes |
-| Review notes (no login / free path) | Updated via API |
-| `demoAccountRequired` | **false** |
 | Privacy URL | https://playin432.com/privacy.html |
+| `demoAccountRequired` | **false** |
 
-## You must confirm in App Store Connect (manual)
+## You must do (Xcode + App Store Connect — cannot be automated here)
 
-Open: https://appstoreconnect.apple.com/apps/6792840657
+### 1. Version-string decision (do this first)
+- [ ] If **1.0 was already released** on the App Store, you cannot resubmit
+      under 1.0 — create a **new version (e.g. 1.0.1)** in ASC and set
+      `MARKETING_VERSION` to match before archiving.
+- [ ] If **1.0 is still pending / was rejected**, build 9 can replace build 8
+      under 1.0 (no marketing-version change needed).
 
-### 1. Version 1.0 content
+### 2. Build & upload build 9
+- [ ] `npm run mobile:ios` (opens Xcode on `ios/App/App.xcworkspace`)
+- [ ] Signing team set; destination = **Any iOS Device (arm64)**
+- [ ] **Product → Archive → Distribute App → App Store Connect → Upload**
+- [ ] Build **9** processes to **VALID** in ASC
+
+### 3. Version 1.0 (or 1.0.1) content — re-confirm
 - [ ] Screenshots present (6.7" / 6.1" / iPad if needed)
 - [ ] Description, keywords, support URL, marketing URL
-- [ ] Age rating complete
-- [ ] App Privacy questionnaire complete
+- [ ] Age rating + App Privacy questionnaire complete
 - [ ] Export compliance (encryption) answered
+- [ ] **What's New** notes filled in (draft below)
+- [ ] Build **9** attached to the version
 
-### 2. In-App Purchases
-- [ ] Lite + Pro appear under version 1.0 **In-App Purchases and Subscriptions** (or are submitted with the app)
-- [ ] Each IAP has localization + review screenshot if Apple requires it for first IAP
+### 4. In-App Purchases
+- [ ] Lite + Pro appear under the version's **In-App Purchases** (or submitted with the app)
+- [ ] Localization + review screenshot if Apple requires it for the first IAP
 
-### 3. Agreements
-- [ ] **Paid Apps Agreement** Active  
-- [ ] Banking + tax complete  
+### 5. Agreements
+- [ ] Paid Apps Agreement **Active**; banking + tax complete
 
-### 4. Sandbox test (recommended before submit)
-- [ ] Sandbox Apple ID on device  
-- [ ] Unlock Lite (StoreKit sheet)  
-- [ ] Unlock Pro  
-- [ ] Restore purchases  
+### 6. Sandbox test (recommended before submit)
+- [ ] Sandbox Apple ID on device → Unlock Lite → Unlock Pro → Restore
+- [ ] Import a track and confirm the **v2 library migration** works cleanly on
+      a device that already has a build-8 library (the risky path)
 
-### 5. Submit
-- [ ] Version 1.0 uses **build 8**  
-- [ ] **Add for Review** / **Submit to App Review**  
-- [ ] If a Review Submission was started via API, finish any missing items in the UI and submit  
+### 7. Submit
+- [ ] **Add for Review → Submit to App Review**
+
+## What's New — App Store release-notes draft
+
+> Faster, lighter library and a smoother upgrade experience:
+> • Your music library now uses far less memory, especially with large collections.
+> • Buy Lite or Pro and we email your unlock code, so you can restore on any device — even if you close the tab.
+> • A clearer plan chooser, a friendlier first-run screen, and accessibility improvements (VoiceOver labels, keyboard playlist reordering, and reduced-motion support).
+> • Import improvements: cleaner track names and a heads-up when you add a duplicate.
 
 ## Product notes for reviewers (already in ASC notes)
 
-- No account / no demo login  
-- Free: import file → A=440→432  
-- Spotify optional, metadata only  
-- IAP: Lite + Pro non-consumables via StoreKit  
-
-## Local native version after this pass
-
-- iOS `CURRENT_PROJECT_VERSION` = **8**  
-- Android `versionCode` = **8**  
+- No account / no demo login
+- Free: import file → A=440→432
+- Spotify optional, metadata only
+- IAP: Lite + Pro non-consumables via StoreKit
