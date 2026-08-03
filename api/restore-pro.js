@@ -165,8 +165,8 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error("restore-pro", err);
-    return res.status(500).json({
-      error: err instanceof Error ? err.message : "Restore failed",
-    });
+    return res
+      .status(500)
+      .json({ error: "Something went wrong. Please try again." });
   }
 }

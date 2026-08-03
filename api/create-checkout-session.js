@@ -165,8 +165,8 @@ export default async function handler(req, res) {
     return res.status(200).json({ url: session.url, id: session.id, tier, gift });
   } catch (err) {
     console.error("create-checkout-session", err);
-    return res.status(500).json({
-      error: err instanceof Error ? err.message : "Checkout failed",
-    });
+    return res
+      .status(500)
+      .json({ error: "Something went wrong. Please try again." });
   }
 }
