@@ -1835,6 +1835,20 @@ input[type="range"]:disabled {
   opacity: 0.75;
 }
 
+/* UX-4 duplicate-import warning */
+.dupe-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  max-height: 40vh;
+  overflow-y: auto;
+  font-size: 0.9rem;
+}
+
+.dupe-list li {
+  margin: 0.15rem 0;
+  word-break: break-word;
+}
+
 .field {
   display: flex;
   flex-direction: column;

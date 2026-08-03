@@ -145,6 +145,17 @@ export function uid(prefix = ""): string {
   return `${prefix}${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+/**
+ * Display-name cleanup (UX-4): strip a trailing `_<8-hex>` uniqueness suffix
+ * (e.g. "song_a1b2c3d4" → "song") that some sources append. Operates on a
+ * name whose file extension has already been removed.
+ */
+export function cleanTrackName(name: string): string {
+  const trimmed = (name ?? "").trim();
+  const cleaned = trimmed.replace(/_[0-9a-f]{8}$/i, "").trim();
+  return cleaned || trimmed;
+}
+
 /** Normalize older track records missing tag fields. */
 export function normalizeTrackRecord(raw: TrackRecord): TrackRecord {
   return {

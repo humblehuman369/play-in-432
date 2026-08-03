@@ -1,26 +1,67 @@
 import type { Playlist, PlayerSettings, TrackMeta, TrackRecord } from "./types";
 import {
+  cleanTrackName,
   DEFAULT_SETTINGS,
   normalizeSettings,
-  normalizeTrackRecord,
   trackMetaFromRecord,
   uid,
 } from "./types";
 
 const DB_NAME = "truehz-player";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const STORE_TRACKS = "tracks";
+/** v2: audio + artwork blobs live here, keyed by track id, so listing/updating
+ *  metadata never materializes the audio (CODE-2 / CODE-3). */
+const STORE_TRACK_BLOBS = "trackBlobs";
 const STORE_PLAYLISTS = "playlists";
 const STORE_SETTINGS = "settings";
+
+/** Row shape in STORE_TRACK_BLOBS. */
+type TrackBlobRow = { id: string; blob: Blob; artworkBlob: Blob | null };
+
+/**
+ * v1 → v2 migration: move each track's inline `blob`/`artworkBlob` into the
+ * new trackBlobs store and strip them from the meta record. Iterates by cursor
+ * (not getAll) so migrating a large library never holds it all in memory. Runs
+ * inside the versionchange transaction: if anything throws, the whole upgrade
+ * aborts atomically and the DB stays at v1 (see failure-safety test).
+ */
+function migrateTracksV1ToV2(tx: IDBTransaction) {
+  const tracks = tx.objectStore(STORE_TRACKS);
+  const blobs = tx.objectStore(STORE_TRACK_BLOBS);
+  const cursorReq = tracks.openCursor();
+  cursorReq.onsuccess = () => {
+    const cursor = cursorReq.result;
+    if (!cursor) return;
+    const rec = cursor.value as TrackRecord & { blob?: Blob };
+    if (rec && rec.blob) {
+      blobs.put({
+        id: rec.id,
+        blob: rec.blob,
+        artworkBlob: rec.artworkBlob ?? null,
+      });
+      // Strip blob fields; keep hasArtwork accurate for the meta-only record.
+      const { blob: _blob, artworkBlob, ...meta } = rec;
+      void _blob;
+      cursor.update({
+        ...meta,
+        hasArtwork: rec.hasArtwork ?? Boolean(artworkBlob),
+      });
+    }
+    cursor.continue();
+  };
+}
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onerror = () => reject(req.error ?? new Error("IndexedDB open failed"));
     req.onsuccess = () => resolve(req.result);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const db = req.result;
+      const tx = req.transaction!;
+
       if (!db.objectStoreNames.contains(STORE_TRACKS)) {
         const tracks = db.createObjectStore(STORE_TRACKS, { keyPath: "id" });
         tracks.createIndex("name", "name", { unique: false });
@@ -33,8 +74,35 @@ function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_SETTINGS)) {
         db.createObjectStore(STORE_SETTINGS, { keyPath: "key" });
       }
+
+      // v2: split blobs into their own store.
+      if (!db.objectStoreNames.contains(STORE_TRACK_BLOBS)) {
+        db.createObjectStore(STORE_TRACK_BLOBS, { keyPath: "id" });
+      }
+      // Only migrate when upgrading from an existing v1 database.
+      if (event.oldVersion >= 1 && event.oldVersion < 2) {
+        migrateTracksV1ToV2(tx);
+      }
     };
   });
+}
+
+/** Normalize a meta-only (v2) stored record; tolerates legacy tag gaps. */
+function metaFromStored(raw: Partial<TrackRecord> & { id: string }): TrackMeta {
+  return {
+    id: raw.id,
+    name: raw.name ?? "",
+    size: raw.size ?? 0,
+    duration: raw.duration ?? null,
+    mimeType: raw.mimeType ?? "audio/mpeg",
+    addedAt: raw.addedAt ?? 0,
+    playCount: raw.playCount ?? 0,
+    lastPlayedAt: raw.lastPlayedAt ?? null,
+    favorite: Boolean(raw.favorite),
+    artist: raw.artist ?? null,
+    album: raw.album ?? null,
+    hasArtwork: Boolean(raw.hasArtwork ?? raw.artworkBlob),
+  };
 }
 
 function txDone(tx: IDBTransaction): Promise<void> {
@@ -57,33 +125,78 @@ function reqToPromise<T>(req: IDBRequest<T>): Promise<T> {
 export async function listTracks(): Promise<TrackMeta[]> {
   const db = await openDb();
   const tx = db.transaction(STORE_TRACKS, "readonly");
-  const all = (await reqToPromise(tx.objectStore(STORE_TRACKS).getAll())) as TrackRecord[];
+  // Meta-only store now — getAll no longer materializes any audio (CODE-2).
+  const all = (await reqToPromise(
+    tx.objectStore(STORE_TRACKS).getAll(),
+  )) as (Partial<TrackRecord> & { id: string })[];
   await txDone(tx);
   db.close();
   return all
-    .map((r) => trackMetaFromRecord(normalizeTrackRecord(r)))
+    .map((r) => metaFromStored(r))
     .sort((a, b) => b.addedAt - a.addedAt);
 }
 
-export async function getTrack(id: string): Promise<TrackRecord | null> {
+/** Read a track's metadata only (no audio). */
+async function getTrackMeta(
+  id: string,
+): Promise<(Partial<TrackRecord> & { id: string }) | null> {
   const db = await openDb();
   const tx = db.transaction(STORE_TRACKS, "readonly");
   const rec = (await reqToPromise(tx.objectStore(STORE_TRACKS).get(id))) as
-    | TrackRecord
+    | (Partial<TrackRecord> & { id: string })
     | undefined;
   await txDone(tx);
   db.close();
-  return rec ? normalizeTrackRecord(rec) : null;
+  return rec ?? null;
+}
+
+/**
+ * Reassemble a full TrackRecord (meta + audio + artwork) for playback/export.
+ * Returns null if the track is unknown or its audio blob is missing.
+ */
+export async function getTrack(id: string): Promise<TrackRecord | null> {
+  const db = await openDb();
+  const tx = db.transaction([STORE_TRACKS, STORE_TRACK_BLOBS], "readonly");
+  // Issue both reads before awaiting so the transaction stays active.
+  const metaReq = tx.objectStore(STORE_TRACKS).get(id);
+  const blobReq = tx.objectStore(STORE_TRACK_BLOBS).get(id);
+  const [meta, blobRow] = (await Promise.all([
+    reqToPromise(metaReq),
+    reqToPromise(blobReq),
+  ])) as [
+    (Partial<TrackRecord> & { id: string }) | undefined,
+    TrackBlobRow | undefined,
+  ];
+  await txDone(tx);
+  db.close();
+  if (!meta || !blobRow?.blob) return null;
+  return {
+    ...metaFromStored(meta),
+    blob: blobRow.blob,
+    artworkBlob: blobRow.artworkBlob ?? null,
+  };
 }
 
 export async function getTrackBlob(id: string): Promise<Blob | null> {
-  const rec = await getTrack(id);
-  return rec?.blob ?? null;
+  const db = await openDb();
+  const tx = db.transaction(STORE_TRACK_BLOBS, "readonly");
+  const row = (await reqToPromise(tx.objectStore(STORE_TRACK_BLOBS).get(id))) as
+    | TrackBlobRow
+    | undefined;
+  await txDone(tx);
+  db.close();
+  return row?.blob ?? null;
 }
 
 export async function getTrackArtwork(id: string): Promise<Blob | null> {
-  const rec = await getTrack(id);
-  return rec?.artworkBlob ?? null;
+  const db = await openDb();
+  const tx = db.transaction(STORE_TRACK_BLOBS, "readonly");
+  const row = (await reqToPromise(tx.objectStore(STORE_TRACK_BLOBS).get(id))) as
+    | TrackBlobRow
+    | undefined;
+  await txDone(tx);
+  db.close();
+  return row?.artworkBlob ?? null;
 }
 
 export type NewTrackInput = {
@@ -194,9 +307,10 @@ export async function addTracksFromFiles(
     try {
       const blob = await materializeBlob(file, mimeType);
       const artworkBlob = await materializeArtwork(input?.artworkBlob ?? null);
+      const id = uid("trk_");
       const record: TrackRecord = {
-        id: uid("trk_"),
-        name: input?.name || fallbackName,
+        id,
+        name: cleanTrackName(input?.name || fallbackName),
         size: blob.size,
         duration: null,
         mimeType: blob.type || mimeType,
@@ -210,20 +324,30 @@ export async function addTracksFromFiles(
         blob,
         artworkBlob,
       };
+      // Split storage: meta → tracks, audio/artwork → trackBlobs.
+      const { blob: _b, artworkBlob: _a, ...meta } = record;
+      void _b;
+      void _a;
+      const blobRow: TrackBlobRow = { id, blob, artworkBlob };
 
       const db = await openDb();
       try {
-        const tx = db.transaction(STORE_TRACKS, "readwrite");
-        const store = tx.objectStore(STORE_TRACKS);
-        await reqToPromise(store.put(record));
+        // Both stores in ONE transaction so a track never lands half-written.
+        const tx = db.transaction(
+          [STORE_TRACKS, STORE_TRACK_BLOBS],
+          "readwrite",
+        );
+        tx.objectStore(STORE_TRACKS).put(meta);
+        tx.objectStore(STORE_TRACK_BLOBS).put(blobRow);
         await txDone(tx);
       } finally {
         db.close();
       }
 
-      // Verify row actually landed (catches silent WebKit failures)
-      const check = await getTrack(record.id);
-      if (!check?.blob || check.blob.size === 0) {
+      // Verify the BLOB row actually landed (catches silent WebKit failures) —
+      // meta alone is not proof the audio persisted.
+      const savedBlob = await getTrackBlob(id);
+      if (!savedBlob || savedBlob.size === 0) {
         throw new Error(
           "Saved track is missing audio data. Storage may be blocked.",
         );
@@ -261,36 +385,58 @@ export async function updateTrackMeta(
     >
   > & { artworkBlob?: Blob | null },
 ): Promise<TrackMeta | null> {
+  const touchesArtwork = patch.artworkBlob !== undefined;
   const db = await openDb();
-  const tx = db.transaction(STORE_TRACKS, "readwrite");
+  const tx = db.transaction(
+    touchesArtwork ? [STORE_TRACKS, STORE_TRACK_BLOBS] : STORE_TRACKS,
+    "readwrite",
+  );
   const store = tx.objectStore(STORE_TRACKS);
-  const existing = (await reqToPromise(store.get(id))) as TrackRecord | undefined;
+  const existing = (await reqToPromise(store.get(id))) as
+    | (Partial<TrackRecord> & { id: string })
+    | undefined;
   if (!existing) {
     await txDone(tx);
     db.close();
     return null;
   }
-  const base = normalizeTrackRecord(existing);
-  const next: TrackRecord = {
+  const base = metaFromStored(existing);
+  // Meta-only patch — the audio blob is never read or rewritten here (CODE-3).
+  const { artworkBlob: _artwork, ...metaPatch } = patch;
+  void _artwork;
+  const next: TrackMeta = {
     ...base,
-    ...patch,
-    artworkBlob:
-      patch.artworkBlob !== undefined ? patch.artworkBlob : base.artworkBlob,
-    hasArtwork:
-      patch.artworkBlob !== undefined
-        ? Boolean(patch.artworkBlob)
-        : patch.hasArtwork ?? base.hasArtwork,
+    ...metaPatch,
+    hasArtwork: touchesArtwork
+      ? Boolean(patch.artworkBlob)
+      : patch.hasArtwork ?? base.hasArtwork,
   };
   store.put(next);
+
+  if (touchesArtwork) {
+    // Route the artwork change to the blob store, preserving the audio blob.
+    const blobStore = tx.objectStore(STORE_TRACK_BLOBS);
+    const existingRow = (await reqToPromise(blobStore.get(id))) as
+      | TrackBlobRow
+      | undefined;
+    if (existingRow) {
+      blobStore.put({ ...existingRow, artworkBlob: patch.artworkBlob ?? null });
+    }
+  }
+
   await txDone(tx);
   db.close();
-  return trackMetaFromRecord(next);
+  return next;
 }
 
 export async function deleteTrack(id: string): Promise<void> {
   const db = await openDb();
-  const tx = db.transaction([STORE_TRACKS, STORE_PLAYLISTS], "readwrite");
+  const tx = db.transaction(
+    [STORE_TRACKS, STORE_TRACK_BLOBS, STORE_PLAYLISTS],
+    "readwrite",
+  );
   tx.objectStore(STORE_TRACKS).delete(id);
+  tx.objectStore(STORE_TRACK_BLOBS).delete(id);
 
   const playlists = (await reqToPromise(
     tx.objectStore(STORE_PLAYLISTS).getAll(),
@@ -311,10 +457,11 @@ export async function deleteTrack(id: string): Promise<void> {
 }
 
 export async function recordPlay(id: string): Promise<void> {
-  const rec = await getTrack(id);
-  if (!rec) return;
+  // Meta-only read + write — never touches the audio blob (CODE-3).
+  const meta = await getTrackMeta(id);
+  if (!meta) return;
   await updateTrackMeta(id, {
-    playCount: rec.playCount + 1,
+    playCount: (meta.playCount ?? 0) + 1,
     lastPlayedAt: Date.now(),
   });
 }

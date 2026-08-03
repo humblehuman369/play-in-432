@@ -1,8 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 import * as db from "../lib/db";
 import { readMediaTags } from "../lib/mediaTags";
-import type { Playlist, TrackMeta } from "../lib/types";
+import { cleanTrackName, type Playlist, type TrackMeta } from "../lib/types";
 import { isAcceptedAudioFile } from "../lib/retune";
+
+/** UX-4 duplicate key: cleaned display name + byte size. */
+function dupKey(name: string, size: number): string {
+  return `${name}\u0000${size}`;
+}
+
+function inputName(input: db.NewTrackInput): string {
+  const stem = (input.fileName || "").replace(/\.[^/.]+$/, "");
+  return cleanTrackName(input.name || stem);
+}
+
+export type PendingDuplicates = {
+  inputs: db.NewTrackInput[];
+  names: string[];
+};
 
 export function useLibrary() {
   const [tracks, setTracks] = useState<TrackMeta[]>([]);
@@ -10,6 +25,9 @@ export function useLibrary() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  // UX-4: exact duplicates held back from an import, awaiting user confirmation.
+  const [pendingDuplicates, setPendingDuplicates] =
+    useState<PendingDuplicates | null>(null);
 
   const refresh = useCallback(async () => {
     const [t, p] = await Promise.all([db.listTracks(), db.listPlaylists()]);
@@ -73,9 +91,34 @@ export function useLibrary() {
           setError("Could not read those files as audio. Try another MP3 or WAV.");
           return [] as TrackMeta[];
         }
-        const created = await db.addTracksFromFiles(inputs);
-        await refresh();
-        if (!created.length) {
+
+        // UX-4: split exact duplicates (same cleaned name + size) from fresh
+        // files. Fresh import immediately; duplicates wait for confirmation.
+        const existingKeys = new Set(tracks.map((t) => dupKey(t.name, t.size)));
+        const fresh: db.NewTrackInput[] = [];
+        const duplicates: db.NewTrackInput[] = [];
+        for (const inp of inputs) {
+          const key = dupKey(inputName(inp), (inp.file as Blob).size);
+          if (existingKeys.has(key)) duplicates.push(inp);
+          else {
+            fresh.push(inp);
+            existingKeys.add(key); // dedupe within this same batch too
+          }
+        }
+
+        const created = fresh.length
+          ? await db.addTracksFromFiles(fresh)
+          : [];
+        if (fresh.length) await refresh();
+
+        if (duplicates.length) {
+          setPendingDuplicates({
+            inputs: duplicates,
+            names: duplicates.map(inputName),
+          });
+        }
+
+        if (!created.length && !duplicates.length) {
           setError("Import finished but no tracks were saved. Try again.");
         } else if (skipped > 0) {
           setError(
@@ -93,8 +136,33 @@ export function useLibrary() {
         setImporting(false);
       }
     },
-    [refresh],
+    [refresh, tracks],
   );
+
+  /** UX-4: import the duplicates the user chose to keep ("import anyway"). */
+  const confirmDuplicateImport = useCallback(async () => {
+    const pending = pendingDuplicates;
+    if (!pending) return [] as TrackMeta[];
+    setPendingDuplicates(null);
+    setImporting(true);
+    try {
+      const created = await db.addTracksFromFiles(pending.inputs);
+      await refresh();
+      return created;
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Failed to save tracks to library.",
+      );
+      return [] as TrackMeta[];
+    } finally {
+      setImporting(false);
+    }
+  }, [pendingDuplicates, refresh]);
+
+  /** UX-4: skip the duplicates. */
+  const dismissDuplicateImport = useCallback(() => {
+    setPendingDuplicates(null);
+  }, []);
 
   const renameTrack = useCallback(
     async (id: string, name: string) => {
@@ -214,6 +282,9 @@ export function useLibrary() {
     error,
     setError,
     importing,
+    pendingDuplicates,
+    confirmDuplicateImport,
+    dismissDuplicateImport,
     refresh,
     importFiles,
     renameTrack,

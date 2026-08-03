@@ -536,6 +536,46 @@ function AppMain({
     </Modal>
   ) : null;
 
+  // UX-4: warn when imported files look like tracks already in the library.
+  const duplicateModal = lib.pendingDuplicates ? (
+    <Modal
+      title="Already in your library?"
+      onClose={lib.dismissDuplicateImport}
+      footer={
+        <>
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={lib.dismissDuplicateImport}
+          >
+            Skip
+          </button>
+          <button
+            type="button"
+            className="btn primary"
+            onClick={() => void lib.confirmDuplicateImport()}
+          >
+            Import anyway
+          </button>
+        </>
+      }
+    >
+      <p>
+        {lib.pendingDuplicates.names.length === 1
+          ? "This file matches a track already in your library (same name and size):"
+          : `${lib.pendingDuplicates.names.length} of these files match tracks already in your library (same name and size):`}
+      </p>
+      <ul className="dupe-list">
+        {lib.pendingDuplicates.names.slice(0, 8).map((n, i) => (
+          <li key={`${n}-${i}`}>{n}</li>
+        ))}
+        {lib.pendingDuplicates.names.length > 8 && (
+          <li>…and {lib.pendingDuplicates.names.length - 8} more</li>
+        )}
+      </ul>
+    </Modal>
+  ) : null;
+
   if (shell === "landing") {
     return (
       <div className="app landing-mode">
@@ -618,6 +658,7 @@ function AppMain({
           </div>
         )}
         {unlockModal}
+        {duplicateModal}
       </div>
     );
   }
@@ -1888,6 +1929,7 @@ function AppMain({
         </div>
       )}
       {unlockModal}
+        {duplicateModal}
     </div>
   );
 }
