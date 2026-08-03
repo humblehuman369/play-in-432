@@ -54,7 +54,7 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [exportEngine, setExportEngine] = useState<
-    "rubberband" | "soundtouch" | null
+    "signalsmith" | "rubberband" | "soundtouch" | null
   >(null);
   const [pitchEstimate, setPitchEstimate] = useState<PitchEstimate | null>(
     null,
@@ -670,7 +670,7 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
       setExportEngine(result.engine);
       if (result.usedFallback) {
         setError(
-          "HQ Rubber Band was unavailable — downloaded with preview-quality engine. Try again or use a shorter track.",
+          "HQ TrueHz Convert was unavailable — downloaded with preview-quality engine. Try again or use a shorter track.",
         );
       }
       return true;

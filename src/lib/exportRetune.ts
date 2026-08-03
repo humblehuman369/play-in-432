@@ -2,8 +2,8 @@
  * Play In 432 export pipeline
  *
  * Live preview → SoundTouch (playerEngine)
- * HQ download  → TrueHz Convert engine (Rubber Band WASM offline)
- * Fallback     → SoundTouch offline if Rubber Band fails
+ * HQ download  → TrueHz Convert engine (Signalsmith Stretch, MIT)
+ * Fallback     → SoundTouch offline if the HQ engine fails
  */
 import {
   SimpleFilter,
@@ -17,6 +17,7 @@ import {
   type RetuneStyle,
 } from "./retune";
 import { BRAND } from "./brand";
+import { renderRetunedSignalsmith } from "./exportSignalsmith";
 import type { ExportFormat } from "./types";
 import type {
   RubberBandWorkerIn,
@@ -29,7 +30,7 @@ const MP3_RATES = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000]
 const MP3_BITRATE_KBPS = 320;
 const MP3_BLOCK = 1152;
 
-export type ExportEngine = "rubberband" | "soundtouch";
+export type ExportEngine = "signalsmith" | "rubberband" | "soundtouch";
 export type { ExportFormat };
 
 export type ExportResult = {
@@ -174,18 +175,18 @@ export async function renderRetunedHq(
   style: RetuneStyle = "concert",
 ): Promise<{ buffer: AudioBuffer; engine: ExportEngine; usedFallback: boolean }> {
   try {
-    onProgress?.(0.01, `${BRAND.convertProduct} · Rubber Band HQ`);
-    const rendered = await renderRetunedRubberBand(
+    onProgress?.(0.01, `${BRAND.convertProduct} · HQ`);
+    const rendered = await renderRetunedSignalsmith(
       buffer,
       sourceA,
       targetA,
       onProgress,
       style,
     );
-    return { buffer: rendered, engine: "rubberband", usedFallback: false };
+    return { buffer: rendered, engine: "signalsmith", usedFallback: false };
   } catch (e) {
-    console.warn("[TrueHz Convert] Rubber Band failed, using SoundTouch:", e);
-    onProgress?.(0.05, "Rubber Band unavailable — using preview-quality engine");
+    console.warn("[TrueHz Convert] HQ engine failed, using SoundTouch:", e);
+    onProgress?.(0.05, "HQ engine unavailable — using preview-quality engine");
     const rendered = await renderRetunedSoundTouch(
       buffer,
       sourceA,
@@ -500,7 +501,7 @@ export function retunedDownloadName(
   const stem = safeFileStem(trackName);
   const s = Math.round(sourceA);
   const t = Math.round(targetA);
-  const tag = engine === "rubberband" ? "TrueHz-HQ" : "preview";
+  const tag = engine === "soundtouch" ? "preview" : "TrueHz-HQ";
   const ext = format === "mp3" ? "mp3" : "wav";
   return `${stem}_A${s}-A${t}_${tag}.${ext}`;
 }

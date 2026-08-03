@@ -54,7 +54,7 @@ const OFFERS = [
   {
     icon: Download,
     title: "TrueHz Convert · HQ export",
-    body: "Need a file for other apps? Download high-quality offline WAV with Rubber Band — not a cheap real-time dump.",
+    body: "Need a file for other apps? Download high-quality offline WAV with TrueHz Convert — not a cheap real-time dump.",
   },
   {
     icon: Lock,
@@ -110,7 +110,7 @@ const FAQS = [
   },
   {
     q: "What is TrueHz™?",
-    a: "TrueHz is the precision retune layer: accurate source→target ratios, pure-tone bed integrity, and TrueHz Convert (Rubber Band) for high-quality offline WAV export.",
+    a: "TrueHz is the precision retune layer: accurate source→target ratios, pure-tone bed integrity, and TrueHz Convert for high-quality offline WAV export.",
   },
   {
     q: "440 to 432 — how far is that?",
@@ -402,7 +402,7 @@ export function LandingView({
             <ul>
               <li>Local library player first</li>
               <li>M3U playlist match to <em>your</em> files only</li>
-              <li>Live play + optional HQ Rubber Band export</li>
+              <li>Live play + optional HQ TrueHz Convert export</li>
               <li>Learn tab with claims we reject</li>
             </ul>
           </div>

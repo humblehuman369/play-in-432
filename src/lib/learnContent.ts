@@ -73,7 +73,7 @@ export const LEARN_ARTICLES: LearnArticle[] = [
         type: "callout",
         tone: "tech",
         title: "TrueHz technology",
-        text: "Live listening uses SoundTouch-class processing for instant A/B. Choose Re-anchor (Solfeggio note map, small shifts) or Concert A (full target÷source). Download HQ uses the same style via TrueHz Convert (Rubber Band). Optional TrueHz pure-tone bed is an exact sine at the labeled Hz. Hear the difference demos the effective A4 ratio.",
+        text: "Live listening uses SoundTouch-class processing for instant A/B. Choose Re-anchor (Solfeggio note map, small shifts) or Concert A (full target÷source). Download HQ uses the same style via TrueHz Convert. Optional TrueHz pure-tone bed is an exact sine at the labeled Hz. Hear the difference demos the effective A4 ratio.",
       },
     ],
   },
@@ -128,7 +128,7 @@ export const LEARN_ARTICLES: LearnArticle[] = [
       },
       {
         type: "p",
-        text: "Your upload is pitch-shifted by target/source. Good for listening to songs, podcasts, or albums with a different concert reference. Live preview is optimized for speed; Download HQ uses Rubber Band for cleaner music quality.",
+        text: "Your upload is pitch-shifted by target/source. Good for listening to songs, podcasts, or albums with a different concert reference. Live preview is optimized for speed; Download HQ uses TrueHz Convert for cleaner music quality.",
       },
       {
         type: "h3",
@@ -276,7 +276,7 @@ export const LEARN_ARTICLES: LearnArticle[] = [
         items: [
           "TrueHz pure-tone bed — generated sine at the labeled Hz under the track (exact layer; mix still retuned separately).",
           "Hear the difference — pure A4 A/B so you hear the ratio without mix complexity.",
-          "Download HQ (TrueHz Convert / Rubber Band) — when a larger shift is intentional and you need a keepable file.",
+          "Download HQ (TrueHz Convert) — when a larger shift is intentional and you need a keepable file.",
         ],
       },
       {
@@ -291,7 +291,7 @@ export const LEARN_ARTICLES: LearnArticle[] = [
     id: "preview-vs-export",
     title: "Live preview vs high-quality export",
     summary:
-      "One product: Play In 432. Live uses SoundTouch; Download HQ uses TrueHz Convert (Rubber Band).",
+      "One product: Play In 432. Live uses SoundTouch; Download HQ uses TrueHz Convert.",
     minutes: 3,
     category: "Quality",
     sections: [
@@ -319,10 +319,10 @@ export const LEARN_ARTICLES: LearnArticle[] = [
         type: "ul",
         items: [
           "Button: Download HQ WAV.",
-          "Offline worker: decode → Rubber Band (high quality, formant-preserved) → optional TrueHz pure-tone bed → 16-bit WAV.",
+          "Offline worker: decode → TrueHz Convert (high quality, formant-preserved) → optional TrueHz pure-tone bed → 16-bit WAV.",
           "Same ratio math as live (target ÷ source).",
           "Use when you need files for phone, car, or archive.",
-          "If Rubber Band fails to load, export falls back to the preview engine and tells you.",
+          "If TrueHz Convert fails to load, export falls back to the preview engine and tells you.",
         ],
       },
       {
