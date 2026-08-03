@@ -29,7 +29,6 @@ import {
   type SpotifyPlaylistSummary,
   type SpotifyPlaylistTrack,
 } from "../lib/spotify";
-import { isNativeApp } from "../lib/native";
 import type { TrackMeta } from "../lib/types";
 
 type Props = {
@@ -341,23 +340,31 @@ export function PlaylistImportPanel({
           </p>
 
           {!clientId ? (
-            <p className="playlist-import-hint">
-              Set <code>VITE_SPOTIFY_CLIENT_ID</code> in <code>.env</code> (and
-              Vercel env for production), then rebuild. Create an app at{" "}
-              <a
-                href="https://developer.spotify.com/dashboard"
-                target="_blank"
-                rel="noreferrer"
-              >
-                developer.spotify.com
-              </a>
-              . Add redirect URIs (exact match, trailing slash counts):
-              {getSpotifyDashboardRedirectHints().map((u) => (
-                <code key={u} className="spotify-redirect-uri">
-                  {u}
-                </code>
-              ))}
-            </p>
+            <>
+              <p className="playlist-import-hint">
+                Spotify playlist matching is temporarily unavailable.
+              </p>
+              {import.meta.env.DEV && (
+                <p className="playlist-import-hint">
+                  Dev setup: set <code>VITE_SPOTIFY_CLIENT_ID</code> in{" "}
+                  <code>.env</code> (and Vercel env for production), then
+                  rebuild. Create an app at{" "}
+                  <a
+                    href="https://developer.spotify.com/dashboard"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    developer.spotify.com
+                  </a>
+                  . Add redirect URIs (exact match, trailing slash counts):
+                  {getSpotifyDashboardRedirectHints().map((u) => (
+                    <code key={u} className="spotify-redirect-uri">
+                      {u}
+                    </code>
+                  ))}
+                </p>
+              )}
+            </>
           ) : !spotifyOk ? (
             <>
               <button
@@ -380,44 +387,19 @@ export function PlaylistImportPanel({
                 <Link2 size={14} /> Connect Spotify
               </button>
               <p className="playlist-import-hint">
-                {isNativeApp() ? (
-                  <>
-                    Opens Spotify login in a secure browser sheet (not inside
-                    the player). After you approve, you return here
-                    automatically. Redirect URI must be{" "}
-                    <code className="spotify-redirect-uri">
-                      {getSpotifyRedirectUri()}
-                    </code>{" "}
-                    in the{" "}
-                    <a
-                      href="https://developer.spotify.com/dashboard"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Spotify Dashboard
-                    </a>
-                    .
-                  </>
-                ) : (
-                  <>
-                    This session will redirect to{" "}
-                    <code className="spotify-redirect-uri">
-                      {getSpotifyRedirectUri()}
-                    </code>
-                    . That string must appear under{" "}
-                    <strong>Redirect URIs</strong> in the{" "}
-                    <a
-                      href="https://developer.spotify.com/dashboard"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Spotify Dashboard
-                    </a>{" "}
-                    for your client ID (copy/paste exactly — include the
-                    trailing <code>/</code>).
-                  </>
-                )}
+                Opens Spotify so you can approve access. We only read your
+                playlist names to match songs you already own — we never stream
+                or upload your music.
               </p>
+              {import.meta.env.DEV && (
+                <p className="playlist-import-hint">
+                  Dev redirect URI (must match the Spotify Dashboard exactly,
+                  trailing slash included):{" "}
+                  <code className="spotify-redirect-uri">
+                    {getSpotifyRedirectUri()}
+                  </code>
+                </p>
+              )}
             </>
           ) : (
             <div className="spotify-connected">
