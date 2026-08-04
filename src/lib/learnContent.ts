@@ -150,7 +150,7 @@ export const LEARN_ARTICLES: LearnArticle[] = [
         type: "callout",
         tone: "info",
         title: "Hybrid listening",
-        text: "Retune the mix for A=432 reference, then optionally enable the TrueHz bed for a verified 432.00 Hz sine underneath. That is the honest dual-layer model — not “the Spotify track is pure 432.”",
+        text: "Retune the mix for A=432 reference, then optionally enable the TrueHz bed for a verified 432.00 Hz sine underneath. That is the honest dual-layer model — not “your track is pure 432 throughout.”",
       },
     ],
   },

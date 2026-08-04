@@ -45,10 +45,6 @@ import {
   recordHqExport,
   stripCheckoutParams,
 } from "./lib/pro";
-import {
-  completeSpotifyLoginFromDeepLink,
-  completeSpotifyLoginFromUrl,
-} from "./lib/spotify";
 import { isNativeApp } from "./lib/native";
 import { BatchExportPanel } from "./components/BatchExportPanel";
 import {
@@ -224,37 +220,11 @@ function AppMain({
   }, []);
 
   // Stripe Checkout return (?checkout=success&session_id=…)
-  // Spotify OAuth return (?code=&state=) — must run at app root, not only on
-  // the Playlists tab (that panel is unmounted on redirect back to /).
-  // Also re-runs on native deep link after external Safari checkout.
+  // Runs at app root; also re-runs on native deep link after external Safari
+  // checkout.
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      // Spotify: native HTTPS bridge returns tokens on playin432://oauth#…
-      // Web PKCE returns ?code=&state= on the site origin.
-      try {
-        const fromDeepLink = completeSpotifyLoginFromDeepLink(
-          window.location.href,
-        );
-        const spotifyDone =
-          fromDeepLink || (await completeSpotifyLoginFromUrl());
-        if (cancelled) return;
-        if (spotifyDone) {
-          setProToast(
-            "Spotify connected. Open Playlists to import a playlist.",
-          );
-          enterApp("playlists");
-          return;
-        }
-      } catch (e) {
-        if (!cancelled) {
-          player.setError(
-            e instanceof Error ? e.message : "Spotify login failed.",
-          );
-          enterApp("playlists");
-        }
-      }
-
       const result = await handleCheckoutReturn(window.location.search);
       if (cancelled) return;
       if (typeof result === "object" && result.kind === "activated") {
@@ -595,19 +565,6 @@ function AppMain({
           onOpenPlayer={() => enterApp("player")}
           onUploadClick={openFilePicker}
           onOpenPlaylists={() => enterApp("playlists")}
-          onConnectSpotify={() => {
-            enterApp("playlists");
-            void import("./lib/spotify")
-              .then(({ beginSpotifyLogin, isSpotifyConnected }) => {
-                if (isSpotifyConnected()) return;
-                return beginSpotifyLogin();
-              })
-              .catch((e) => {
-                player.setError(
-                  e instanceof Error ? e.message : "Spotify login failed.",
-                );
-              });
-          }}
           onPickFrequency={(hz) => {
             if (!pro.canUseTargetHz(hz)) {
               openUpgrade("frequency");

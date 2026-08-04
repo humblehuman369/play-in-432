@@ -1,34 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  FileAudio,
-  Link2,
-  ListPlus,
-  Loader2,
-  LogOut,
-  Music2,
-} from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { Download, FileAudio, ListPlus, Loader2 } from "lucide-react";
 import { isM3uFile, readM3uFile } from "../lib/m3u";
 import {
   formatQueryLabel,
   matchQueriesToLibrary,
   type MatchReport,
 } from "../lib/trackMatch";
-import {
-  beginSpotifyLogin,
-  clearSpotifyTokens,
-  fetchPlaylistTracks,
-  fetchUserPlaylists,
-  getSpotifyClientId,
-  getSpotifyDashboardRedirectHints,
-  getSpotifyRedirectUri,
-  hasSpotifyLibraryScope,
-  isSpotifyConnected,
-  probeSpotifyAccess,
-  SPOTIFY_LIKED_SONGS_ID,
-  spotifyTracksToQueries,
-  type SpotifyPlaylistSummary,
-  type SpotifyPlaylistTrack,
-} from "../lib/spotify";
 import type { TrackMeta } from "../lib/types";
 
 type Props = {
@@ -55,18 +32,6 @@ export function PlaylistImportPanel({
   const [status, setStatus] = useState<string | null>(null);
   const [lastReport, setLastReport] = useState<MatchReport | null>(null);
   const [lastName, setLastName] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{
-    name: string;
-    tracks: SpotifyPlaylistTrack[];
-    report: MatchReport | null;
-  } | null>(null);
-
-  const [spotifyOk, setSpotifyOk] = useState(isSpotifyConnected);
-  const [spotifyLists, setSpotifyLists] = useState<SpotifyPlaylistSummary[]>(
-    [],
-  );
-  const [spotifyLoading, setSpotifyLoading] = useState(false);
-  const clientId = getSpotifyClientId();
   const libraryCount = tracks.length;
 
   const finishImport = useCallback(
@@ -76,15 +41,15 @@ export function PlaylistImportPanel({
       if (!report.matchedIds.length) {
         setStatus(
           libraryCount === 0
-            ? `“${name}” has ${report.total} Spotify songs listed below — but your library is empty. Add those audio files first (Library → Add music), then match again.`
-            : `Found ${report.total} Spotify songs, but 0 matched files in your library (${libraryCount} local tracks). Titles must match files you already imported.`,
+            ? `“${name}” lists ${report.total} songs, but your library is empty. Add those audio files first (Library → Add music), then import the playlist again.`
+            : `Found ${report.total} songs, but 0 matched files in your library (${libraryCount} local tracks). Titles must match files you already imported.`,
         );
         return;
       }
       const pl = await onCreatePlaylist(name, report.matchedIds);
       if (pl) {
         setStatus(
-          `Created “${pl.name}” with ${report.matched} of ${report.total} tracks from your library. Unmatched Spotify songs stay listed below — import those files to add them.`,
+          `Created “${pl.name}” with ${report.matched} of ${report.total} tracks from your library. Unmatched songs stay listed below — import those files to add them.`,
         );
         onSelectPlaylist?.(pl.id);
       }
@@ -125,132 +90,6 @@ export function PlaylistImportPanel({
     [tracks, finishImport, onError],
   );
 
-  const loadSpotifyPlaylists = useCallback(async () => {
-    if (!isSpotifyConnected()) {
-      setSpotifyOk(false);
-      setSpotifyLists([]);
-      return;
-    }
-    setSpotifyLoading(true);
-    onError?.(null);
-    try {
-      const probe = await probeSpotifyAccess();
-      if (!probe.ok) {
-        setSpotifyOk(false);
-        onError?.(
-          probe.error ||
-            "Spotify connected but API failed. Disconnect and reconnect.",
-        );
-        return;
-      }
-      // probe already loaded playlists via fetchUserPlaylists — fetch once more
-      // only for the list UI (cheap; keeps probe self-contained for diagnostics)
-      const list = await fetchUserPlaylists();
-      setSpotifyLists(list);
-      setSpotifyOk(true);
-      const liked = list.find((p) => p.isLikedSongs);
-      const likedLabel =
-        liked && liked.trackCount >= 0
-          ? `${liked.trackCount} liked titles`
-          : "Liked Songs blocked — use Reconnect and approve library access";
-      setStatus(
-        `Connected as ${probe.displayName || "Spotify user"} · ${list.filter((p) => !p.isLikedSongs).length} playlists · ${likedLabel}. Tap a list to load song titles (audio is never streamed).`,
-      );
-    } catch (e) {
-      console.error(e);
-      setSpotifyOk(false);
-      onError?.(
-        e instanceof Error ? e.message : "Could not load Spotify playlists.",
-      );
-    } finally {
-      setSpotifyLoading(false);
-    }
-  }, [onError]);
-
-  // OAuth code exchange runs in App root (so it works after redirect to /).
-  // Here we only hydrate UI if tokens already exist or become available.
-  useEffect(() => {
-    if (isSpotifyConnected()) {
-      setSpotifyOk(true);
-      void loadSpotifyPlaylists();
-      return;
-    }
-    // After App root completes OAuth, URL is cleaned; re-check shortly
-    const t = window.setTimeout(() => {
-      if (isSpotifyConnected()) {
-        setSpotifyOk(true);
-        setStatus("Connected to Spotify. Choose a playlist to match.");
-        void loadSpotifyPlaylists();
-      }
-    }, 400);
-    return () => window.clearTimeout(t);
-  }, [loadSpotifyPlaylists]);
-
-  const openSpotifyPlaylist = useCallback(
-    async (pl: SpotifyPlaylistSummary) => {
-      setBusy(true);
-      setStatus(null);
-      onError?.(null);
-      setPreview(null);
-      try {
-        const spTracks = await fetchPlaylistTracks(pl.id);
-        if (!spTracks.length) {
-          const liked = pl.isLikedSongs || pl.id === SPOTIFY_LIKED_SONGS_ID;
-          setStatus(
-            liked
-              ? `Could not load Liked Songs. Disconnect Spotify and connect again so Spotify can grant “View your library” (user-library-read).`
-              : `“${pl.name}” returned no song titles from Spotify (empty playlist, private, or region-locked).`,
-          );
-          return;
-        }
-        const queries = spotifyTracksToQueries(spTracks);
-        const report =
-          libraryCount > 0 ? matchQueriesToLibrary(queries, tracks) : null;
-        setPreview({ name: pl.name, tracks: spTracks, report });
-        setLastReport(report);
-        setLastName(pl.name);
-
-        if (!libraryCount) {
-          setStatus(
-            `Showing ${spTracks.length} song titles from “${pl.name}”. Spotify never sends audio — only names. Add matching MP3/WAV files under Library, then open this list again to match.`,
-          );
-          return;
-        }
-        await finishImport(pl.name, report!);
-      } catch (e) {
-        console.error(e);
-        const msg =
-          e instanceof Error
-            ? e.message
-            : "Failed to load Spotify playlist tracks.";
-        // 403 often means old token without user-library-read
-        if (/403|Insufficient|scope|library/i.test(msg)) {
-          onError?.(
-            `${msg} — Disconnect Spotify and Connect again to approve library access for Liked Songs.`,
-          );
-        } else {
-          onError?.(msg);
-        }
-      } finally {
-        setBusy(false);
-      }
-    },
-    [tracks, finishImport, onError, libraryCount],
-  );
-
-  const reconnectSpotify = useCallback(() => {
-    clearSpotifyTokens();
-    setSpotifyOk(false);
-    setSpotifyLists([]);
-    setPreview(null);
-    setStatus(
-      "Reconnecting — approve every permission, including access to your library / Liked Songs…",
-    );
-    void beginSpotifyLogin({ forceConsent: true }).catch((e) => {
-      onError?.(e instanceof Error ? e.message : "Spotify login failed");
-    });
-  }, [onError]);
-
   return (
     <section className="playlist-import card-block">
       <div className="playlist-import-head">
@@ -258,10 +97,9 @@ export function PlaylistImportPanel({
         <h3>Import playlist</h3>
       </div>
       <p className="playlist-import-lead">
-        <strong>Spotify cannot stream or retune inside this app.</strong> We
-        only read playlist <em>names and song titles</em>, then match them to
-        audio files you already added. Library right now:{" "}
-        <strong>{libraryCount}</strong> track{libraryCount === 1 ? "" : "s"}.
+        Import a playlist file and we’ll match its song titles to audio you’ve
+        already added. Library right now: <strong>{libraryCount}</strong> track
+        {libraryCount === 1 ? "" : "s"}.
         {libraryCount === 0 && onOpenLibrary && (
           <>
             {" "}
@@ -271,16 +109,6 @@ export function PlaylistImportPanel({
           </>
         )}
       </p>
-      {spotifyOk && !hasSpotifyLibraryScope() && (
-        <p className="playlist-import-hint playlist-import-warn" role="status">
-          Your Spotify connection is missing library access, so{" "}
-          <strong>Liked Songs</strong> may show 0 titles.{" "}
-          <button type="button" className="link-btn" onClick={reconnectSpotify}>
-            Disconnect & reconnect
-          </button>{" "}
-          and approve all permissions.
-        </p>
-      )}
 
       <div className="playlist-import-grid">
         {/* M3U */}
@@ -327,162 +155,29 @@ export function PlaylistImportPanel({
           )}
         </div>
 
-        {/* Spotify */}
+        {/* Where to get retunable music */}
         <div className="playlist-import-card">
           <div className="playlist-import-card-title">
-            <Music2 size={16} />
-            <span>Spotify playlist</span>
+            <Download size={16} />
+            <span>Get music you can retune</span>
           </div>
           <p>
-            Connect, then tap a playlist to see its songs. We match titles to
-            your local files and build a Play In 432 playlist from matches
-            only.
+            Play In 432 retunes files you own. Buy DRM-free downloads from the{" "}
+            <strong>iTunes Store</strong>, <strong>Amazon Music</strong> (MP3),
+            or <strong>Bandcamp</strong>, then add them here.
           </p>
-
-          {!clientId ? (
-            <>
-              <p className="playlist-import-hint">
-                Spotify playlist matching is temporarily unavailable.
-              </p>
-              {import.meta.env.DEV && (
-                <p className="playlist-import-hint">
-                  Dev setup: set <code>VITE_SPOTIFY_CLIENT_ID</code> in{" "}
-                  <code>.env</code> (and Vercel env for production), then
-                  rebuild. Create an app at{" "}
-                  <a
-                    href="https://developer.spotify.com/dashboard"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    developer.spotify.com
-                  </a>
-                  . Add redirect URIs (exact match, trailing slash counts):
-                  {getSpotifyDashboardRedirectHints().map((u) => (
-                    <code key={u} className="spotify-redirect-uri">
-                      {u}
-                    </code>
-                  ))}
-                </p>
-              )}
-            </>
-          ) : !spotifyOk ? (
-            <>
-              <button
-                type="button"
-                className="btn primary sm"
-                disabled={busy}
-                onClick={() => {
-                  void beginSpotifyLogin({ forceConsent: true }).catch((e) => {
-                    const msg =
-                      e instanceof Error ? e.message : "Spotify login failed";
-                    const redirect = getSpotifyRedirectUri();
-                    onError?.(
-                      /redirect/i.test(msg)
-                        ? `${msg} Add this exact Redirect URI in Spotify Dashboard → your app → Settings: ${redirect}`
-                        : msg,
-                    );
-                  });
-                }}
-              >
-                <Link2 size={14} /> Connect Spotify
-              </button>
-              <p className="playlist-import-hint">
-                Opens Spotify so you can approve access. We only read your
-                playlist names to match songs you already own — we never stream
-                or upload your music.
-              </p>
-              {import.meta.env.DEV && (
-                <p className="playlist-import-hint">
-                  Dev redirect URI (must match the Spotify Dashboard exactly,
-                  trailing slash included):{" "}
-                  <code className="spotify-redirect-uri">
-                    {getSpotifyRedirectUri()}
-                  </code>
-                </p>
-              )}
-            </>
-          ) : (
-            <div className="spotify-connected">
-              <div className="spotify-connected-actions">
-                <button
-                  type="button"
-                  className="btn sm"
-                  disabled={spotifyLoading || busy}
-                  onClick={() => void loadSpotifyPlaylists()}
-                >
-                  {spotifyLoading ? (
-                    <>
-                      <Loader2 size={14} className="spin" /> Loading…
-                    </>
-                  ) : (
-                    "Refresh playlists"
-                  )}
-                </button>
-                <button
-                  type="button"
-                  className="btn sm"
-                  onClick={() => {
-                    clearSpotifyTokens();
-                    setSpotifyOk(false);
-                    setSpotifyLists([]);
-                    setPreview(null);
-                    setStatus("Disconnected from Spotify.");
-                  }}
-                >
-                  <LogOut size={14} /> Disconnect
-                </button>
-                <button
-                  type="button"
-                  className="btn sm"
-                  onClick={reconnectSpotify}
-                  title="Request latest permissions including Liked Songs"
-                >
-                  Reconnect
-                </button>
-              </div>
-              {libraryCount === 0 && (
-                <p className="playlist-import-hint playlist-import-warn">
-                  Your library is empty. Tap a Spotify list to preview{" "}
-                  <em>titles only</em>, then add those audio files under Library
-                  so we can match and retune them. Streaming audio is never
-                  downloaded.
-                </p>
-              )}
-              {spotifyLists.length > 0 ? (
-                <ul className="spotify-pl-list">
-                  {spotifyLists.map((pl) => (
-                    <li key={pl.id}>
-                      <button
-                        type="button"
-                        className="spotify-pl-item"
-                        disabled={busy}
-                        onClick={() => void openSpotifyPlaylist(pl)}
-                      >
-                        <span className="spotify-pl-name">
-                          {pl.isLikedSongs ? "♥ " : ""}
-                          {pl.name}
-                        </span>
-                        <span className="spotify-pl-meta">
-                          {pl.trackCount < 0
-                            ? "needs reconnect"
-                            : `${pl.trackCount} titles on Spotify`}
-                          {pl.owner ? ` · ${pl.owner}` : ""}
-                          {libraryCount === 0
-                            ? " · tap to preview titles"
-                            : " · tap to match library"}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                !spotifyLoading && (
-                  <p className="playlist-import-hint">
-                    No playlists found (or still loading).
-                  </p>
-                )
-              )}
-            </div>
+          <p className="playlist-import-hint">
+            Streaming services (Spotify, Apple Music) are DRM-locked and can’t
+            be retuned — only files you download and own.
+          </p>
+          {onOpenLibrary && (
+            <button
+              type="button"
+              className="btn sm"
+              onClick={onOpenLibrary}
+            >
+              <Download size={14} /> Add music
+            </button>
           )}
         </div>
       </div>
@@ -493,61 +188,7 @@ export function PlaylistImportPanel({
         </p>
       )}
 
-      {preview && preview.tracks.length > 0 && (
-        <div className="spotify-track-preview">
-          <div className="spotify-track-preview-head">
-            <h4>
-              Songs in “{preview.name}”{" "}
-              <span>
-                ({preview.tracks.length}
-                {preview.report
-                  ? ` · ${preview.report.matched} matched in library`
-                  : " · preview only"}
-                )
-              </span>
-            </h4>
-            {libraryCount === 0 && onOpenLibrary && (
-              <button
-                type="button"
-                className="btn primary sm"
-                onClick={onOpenLibrary}
-              >
-                Add music to Library
-              </button>
-            )}
-          </div>
-          <ul className="spotify-track-list">
-            {preview.tracks.slice(0, 80).map((t, i) => {
-              const matched = preview.report?.results[i]?.track;
-              return (
-                <li
-                  key={`${t.spotifyUri || t.title}-${i}`}
-                  className={matched ? "is-matched" : "is-unmatched"}
-                >
-                  <span className="spotify-track-label">
-                    {t.artist ? `${t.artist} — ${t.title}` : t.title}
-                  </span>
-                  <span className="spotify-track-flag">
-                    {matched ? "In library" : "Need file"}
-                  </span>
-                </li>
-              );
-            })}
-            {preview.tracks.length > 80 && (
-              <li className="spotify-track-more">
-                …and {preview.tracks.length - 80} more
-              </li>
-            )}
-          </ul>
-          <p className="playlist-import-hint">
-            “Need file” means that Spotify title is not in your Play In 432
-            library yet. Import the MP3/WAV/etc., then open this playlist again
-            to match.
-          </p>
-        </div>
-      )}
-
-      {lastReport && lastReport.unmatched.length > 0 && !preview && (
+      {lastReport && lastReport.unmatched.length > 0 && (
         <details className="playlist-import-unmatched" open>
           <summary>
             Unmatched ({lastReport.unmatched.length})
@@ -555,9 +196,7 @@ export function PlaylistImportPanel({
           </summary>
           <ul>
             {lastReport.unmatched.slice(0, 40).map((q, i) => (
-              <li key={`${formatQueryLabel(q)}-${i}`}>
-                {formatQueryLabel(q)}
-              </li>
+              <li key={`${formatQueryLabel(q)}-${i}`}>{formatQueryLabel(q)}</li>
             ))}
             {lastReport.unmatched.length > 40 && (
               <li>…and {lastReport.unmatched.length - 40} more</li>

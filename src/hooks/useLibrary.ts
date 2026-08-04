@@ -206,7 +206,7 @@ export function useLibrary() {
     [refresh],
   );
 
-  /** Create playlist and set track order (M3U / Spotify import). */
+  /** Create playlist and set track order (M3U import). */
   const createPlaylistWithTracks = useCallback(
     async (name: string, trackIds: string[]) => {
       const pl = await db.createPlaylist(name);

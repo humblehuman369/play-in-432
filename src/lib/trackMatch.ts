@@ -1,5 +1,5 @@
 /**
- * Match external playlist entries (M3U / Spotify) to local library tracks.
+ * Match external playlist entries (M3U) to local library tracks.
  * Title + artist fuzzy matching — no audio leaves the device for matching.
  */
 import type { TrackMeta } from "./types";

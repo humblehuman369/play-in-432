@@ -29,10 +29,8 @@ export const APP_URL_SCHEME = "playin432";
  * Never navigate the WebView to an external origin.
  *
  * Handles:
- *   playin432://oauth#access_token=…        (Spotify native HTTPS bridge)
- *   playin432://callback?code=…&state=…     (legacy custom-scheme attempt)
  *   playin432://?checkout=success&session_id=…
- *   https://playin432.com/?code=…
+ *   https://playin432.com/?checkout=success&session_id=…
  */
 export function applyDeepLinkUrl(url: string): void {
   try {
@@ -109,7 +107,7 @@ export async function initNativeShell(): Promise<void> {
     /* optional */
   }
 
-  // Deep links (Stripe return, Spotify) — keep WebView on local origin
+  // Deep links (Stripe return) — keep WebView on local origin
   try {
     const { App } = await import("@capacitor/app");
     App.addListener("appUrlOpen", ({ url }) => {

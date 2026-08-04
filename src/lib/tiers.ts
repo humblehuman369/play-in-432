@@ -95,7 +95,7 @@ export const PRO_FEATURES = [
 export const FREE_FEATURES = [
   "Unlimited live retune · A=440 → A=432",
   "Library, playlists, Learn",
-  "Spotify playlist match (metadata only)",
+  "M3U playlist import & match",
   `${FREE_HQ_EXPORT_LIMIT} TrueHz Convert HQ exports (lifetime)`,
   "TrueHz pure-tone bed",
 ] as const;

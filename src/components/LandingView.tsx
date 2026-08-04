@@ -4,7 +4,6 @@ import {
   Check,
   Download,
   FolderOpen,
-  Link2,
   ListMusic,
   Lock,
   Music2,
@@ -25,8 +24,6 @@ type Props = {
   onUploadClick: () => void;
   /** Open Playlists tab (import M3U / local list) */
   onOpenPlaylists?: () => void;
-  /** Connect Spotify (playlist metadata → match your files) */
-  onConnectSpotify?: () => void;
   /** Apply a target concert A and open the player */
   onPickFrequency?: (hz: number) => void;
   onOpenLearn?: () => void;
@@ -62,7 +59,7 @@ const OFFERS = [
   {
     icon: Lock,
     title: "Private by design",
-    body: "Files stay on your device (IndexedDB). No account. No upload server for your library. Spotify is metadata-only.",
+    body: "Files stay on your device (IndexedDB). No account. No upload server for your library.",
   },
   {
     icon: BookOpen,
@@ -75,7 +72,7 @@ const STEPS = [
   {
     n: "1",
     title: "Add your music",
-    body: "Import files from your phone or computer, or pull a playlist (Spotify match or M3U) against songs you already own.",
+    body: "Import files from your phone or computer, or match an M3U playlist against songs you already own.",
   },
   {
     n: "2",
@@ -105,7 +102,7 @@ const NOT_FOR = [
 const FAQS = [
   {
     q: "Does this stream Spotify in 432?",
-    a: "No. Spotify Web API is used only for playlist metadata so you can match titles against music you already imported. We never stream or retune Spotify’s audio.",
+    a: "No — and it can’t. Streaming services are DRM-locked, so their audio can’t be retuned. Play In 432 only retunes files you own: buy DRM-free downloads (iTunes Store, Amazon MP3, Bandcamp), then import them.",
   },
   {
     q: "Is my music uploaded?",
@@ -125,7 +122,6 @@ export function LandingView({
   onOpenPlayer,
   onUploadClick,
   onOpenPlaylists,
-  onConnectSpotify,
   onPickFrequency,
   onOpenLearn,
   onUpgrade,
@@ -144,7 +140,6 @@ export function LandingView({
 }: Props) {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const openPlaylists = onOpenPlaylists ?? onOpenPlayer;
-  const connectSpotify = onConnectSpotify ?? openPlaylists;
 
   return (
     <div className="landing">
@@ -197,8 +192,8 @@ export function LandingView({
           <p className="landing-lead">
             Add songs you already own, retune them live to{" "}
             <span className="gold-hz">A=432</span> (or other targets), and play
-            privately on this device. We never stream Spotify audio — connect
-            Spotify only to match playlist names to your files.
+            privately on this device. We never stream Spotify audio — Play In
+            432 retunes only the files you own and import.
           </p>
 
           <p className="landing-start-label">How do you want to start?</p>
@@ -226,21 +221,6 @@ export function LandingView({
               </span>
               <span className="landing-start-hint">
                 Tip: on a computer you can also drag files onto this page
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className="landing-start-card"
-              onClick={connectSpotify}
-            >
-              <span className="landing-start-icon" aria-hidden>
-                <Link2 size={22} />
-              </span>
-              <span className="landing-start-title">Connect Spotify</span>
-              <span className="landing-start-desc">
-                Match a Spotify playlist to songs already in your library.
-                Metadata only — no streaming.
               </span>
             </button>
 
@@ -421,7 +401,7 @@ export function LandingView({
             <h3>{BRAND.product}</h3>
             <ul>
               <li>Local library player first</li>
-              <li>Spotify = playlist match to <em>your</em> files only</li>
+              <li>M3U playlist match to <em>your</em> files only</li>
               <li>Live play + optional HQ Rubber Band export</li>
               <li>Learn tab with claims we reject</li>
             </ul>
@@ -507,10 +487,6 @@ export function LandingView({
           <button type="button" className="btn primary lg" onClick={onUploadClick}>
             <FolderOpen size={18} />
             Add music
-          </button>
-          <button type="button" className="btn ghost lg" onClick={connectSpotify}>
-            <Link2 size={18} />
-            Connect Spotify
           </button>
           <button type="button" className="btn ghost lg" onClick={onOpenPlayer}>
             Open player
