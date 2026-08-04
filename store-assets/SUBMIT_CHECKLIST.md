@@ -1,9 +1,9 @@
 # App Store Submit Checklist — Play In 432 1.0 (Build 9)
 
-**As of:** 2026-08-03
+**As of:** 2026-08-04
 **App ID:** 6792840657
 **Bundle:** `com.playin432.app`
-**Web at:** commit `721c5ef` (all synced into native via `npx cap sync`)
+**Web at:** commit `1d2927c` (all synced into native via `npx cap sync`)
 
 ## What changed since build 8
 
@@ -26,7 +26,12 @@ the native app:
   exact duplicate imports. *(UX-4)*
 - **Front-of-house** — two-card Lite/Pro upgrade screen, empty-state player,
   accessibility (aria-labels, keyboard playlist reorder, reduced-motion). *(UX-1/2/3)*
-- **Spotify card** no longer shows developer setup text to end users.
+- **Spotify removed** — the Spotify connect/import integration is gone
+  entirely (streaming audio is DRM-locked and can't be retuned). Replaced with
+  a pointer to buy DRM-free downloads (iTunes Store / Amazon MP3 / Bandcamp)
+  and import them. M3U playlist import stays. No OAuth, no Spotify SDK.
+- **Landing polish** — centered the two start cards after the Spotify card was
+  removed; fixed the AppIcon "unassigned child" asset-catalog warning.
 
 ## Native version this pass
 
@@ -56,7 +61,8 @@ the native app:
       under 1.0 (no marketing-version change needed).
 
 ### 2. Build & upload build 9
-- [ ] `npm run mobile:ios` (opens Xcode on `ios/App/App.xcworkspace`)
+- [ ] `npm run mobile:ios` (opens Xcode on `ios/App/App.xcodeproj` — this
+      project uses Swift Package Manager for Capacitor plugins, no `.xcworkspace`)
 - [ ] Signing team set; destination = **Any iOS Device (arm64)**
 - [ ] **Product → Archive → Distribute App → App Store Connect → Upload**
 - [ ] Build **9** processes to **VALID** in ASC
@@ -96,5 +102,8 @@ the native app:
 
 - No account / no demo login
 - Free: import file → A=440→432
-- Spotify optional, metadata only
+- No third-party streaming integration; retunes only files the user imports
 - IAP: Lite + Pro non-consumables via StoreKit
+
+⚠️ **Update the ASC reviewer notes** if they still mention Spotify — the
+integration was removed in build 9.
