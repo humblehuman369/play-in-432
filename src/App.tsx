@@ -664,7 +664,7 @@ function AppMain({
                   ? `Re-anchor ${Math.round(player.settings.targetA)} · A≈${Math.round(impliedA)}`
                   : `A=${Math.round(player.settings.sourceA)} → A=${Math.round(player.settings.targetA)}`}
               </span>
-              <span className="badge muted">{formatCents(cents)}</span>
+              <span className="badge muted">shift {formatCents(cents)}</span>
             </>
           )}
         </div>

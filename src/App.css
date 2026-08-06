@@ -7,7 +7,9 @@
   --bg: #070b0f;
   --panel: rgba(12, 20, 24, 0.85);
   --text: #e8f7f3;
-  --muted: #8aa8a0;
+  --muted-strong: #9ab5ad; /* brighter secondary — tab labels, badges (9.0:1) */
+  --muted: #8aa8a0; /* default secondary text (7.7:1) */
+  --faint: #6f8a82; /* tertiary — disclaimers, footnotes, hints (5.0:1, WCAG AA) */
   --border: rgba(255, 255, 255, 0.06);
   --danger: #ff7b7b;
 
@@ -107,7 +109,7 @@
 
 .badge.muted {
   background: rgba(255, 255, 255, 0.04);
-  color: #9ab5ad;
+  color: var(--muted-strong);
   border-color: rgba(255, 255, 255, 0.08);
 }
 
@@ -119,7 +121,7 @@
 }
 
 .footer a {
-  color: #7a9a90;
+  color: var(--muted);
   text-decoration: none;
 }
 
@@ -239,14 +241,14 @@
   align-items: center;
   gap: 0.3rem;
   font-size: 0.75rem;
-  color: #6f8a82;
+  color: var(--faint);
   margin-top: 0.25rem;
 }
 
 .learn-disclaimer {
   margin: 0.25rem 0 0;
   font-size: 0.78rem;
-  color: #6f8a82;
+  color: var(--faint);
   line-height: 1.45;
 }
 
@@ -304,7 +306,7 @@
   gap: 0.3rem;
   margin-top: 0.55rem;
   font-size: 0.78rem;
-  color: #6f8a82;
+  color: var(--faint);
 }
 
 .learn-article-body {
@@ -465,7 +467,7 @@
   gap: 0.35rem;
   border: none;
   background: transparent;
-  color: #9ab5ad;
+  color: var(--muted-strong);
   font: inherit;
   font-weight: 600;
   font-size: 0.82rem;
@@ -627,7 +629,7 @@ textarea::placeholder {
 .album-line {
   margin: 0.15rem 0 0 !important;
   font-size: 0.8rem !important;
-  color: #6f8a82 !important;
+  color: var(--faint) !important;
 }
 
 .tartist {
@@ -683,7 +685,7 @@ textarea::placeholder {
 
 .pe-note {
   font-size: 0.75rem;
-  color: #6f8a82;
+  color: var(--faint);
   margin-top: 0.15rem;
 }
 
@@ -762,7 +764,7 @@ textarea::placeholder {
 .mode-toggle button {
   border: none;
   background: transparent;
-  color: #9ab5ad;
+  color: var(--muted-strong);
   font: inherit;
   font-weight: 600;
   font-size: 0.9rem;
@@ -901,7 +903,7 @@ input[type="range"]:disabled {
   bottom: 0.5rem;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #6f8a82;
+  color: var(--faint);
   pointer-events: none;
 }
 
@@ -929,14 +931,14 @@ input[type="range"]:disabled {
 }
 
 .pitch-math .muted-note {
-  color: #6f8a82;
+  color: var(--faint);
   font-size: 0.78rem;
 }
 
 .pitch-disclaimer {
   margin: 0;
   font-size: 0.78rem;
-  color: #9ab5ad;
+  color: var(--muted-strong);
   line-height: 1.4;
 }
 
@@ -1162,7 +1164,7 @@ input[type="range"]:disabled {
 
 .empty {
   margin: 0;
-  color: #6f8a82;
+  color: var(--faint);
   font-size: 0.9rem;
   text-align: center;
   padding: 1rem 0.5rem;
@@ -1216,7 +1218,7 @@ input[type="range"]:disabled {
 }
 
 .idx {
-  color: #6f8a82;
+  color: var(--faint);
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
 }
@@ -1258,7 +1260,7 @@ input[type="range"]:disabled {
 /* ── Info card ──────────────────────────────────────────────── */
 .info-card {
   font-size: 0.88rem;
-  color: #9ab5ad;
+  color: var(--muted-strong);
 }
 
 .info-title {
@@ -1297,7 +1299,7 @@ input[type="range"]:disabled {
 .footer {
   margin-top: 1.75rem;
   text-align: center;
-  color: #6f8a82;
+  color: var(--faint);
   font-size: 0.78rem;
 }
 
@@ -1540,7 +1542,7 @@ input[type="range"]:disabled {
 }
 
 .drag-handle {
-  color: #6f8a82;
+  color: var(--faint);
   cursor: grab;
   display: grid;
   place-items: center;
@@ -2150,7 +2152,7 @@ input[type="range"]:disabled {
 .freq-strip-note {
   margin: 0.55rem 0 0;
   font-size: 0.78rem;
-  color: #9ab5ad;
+  color: var(--muted-strong);
   line-height: 1.4;
 }
 
@@ -2170,7 +2172,7 @@ input[type="range"]:disabled {
 .freq-strip-disclaimer {
   margin: 0.45rem 0 0;
   font-size: 0.72rem;
-  color: #6f8a82;
+  color: var(--faint);
   line-height: 1.4;
 }
 
@@ -2178,7 +2180,7 @@ input[type="range"]:disabled {
   width: 100%;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #6f8a82;
+  color: var(--faint);
   margin-bottom: 0.1rem;
 }
 
@@ -2248,7 +2250,7 @@ input[type="range"]:disabled {
 .hear-diff-note {
   margin: 0;
   font-size: 0.72rem;
-  color: #6f8a82;
+  color: var(--faint);
   line-height: 1.4;
 }
 
@@ -2336,7 +2338,7 @@ input[type="range"]:disabled {
 .sleep-timer-note {
   margin: 0.5rem 0 0;
   font-size: 0.72rem;
-  color: #6f8a82;
+  color: var(--faint);
   line-height: 1.35;
 }
 
@@ -2410,7 +2412,7 @@ input[type="range"]:disabled {
 .playlist-import-hint {
   margin: 0 !important;
   font-size: 0.72rem !important;
-  color: #6f8a82 !important;
+  color: var(--faint) !important;
   line-height: 1.4;
 }
 
@@ -3522,7 +3524,7 @@ input[type="range"]:disabled {
    aha lead — mute it to a neutral chip until a track is imported. */
 .pro-upgrade-badge.subtle {
   background: rgba(255, 255, 255, 0.04) !important;
-  color: #9ab5ad !important;
+  color: var(--muted-strong) !important;
   border-color: rgba(255, 255, 255, 0.1);
 }
 
@@ -3648,7 +3650,7 @@ input[type="range"]:disabled {
 .pricing-footnote {
   margin-top: 1rem;
   font-size: 0.8rem;
-  color: #6a8a82;
+  color: var(--faint);
 }
 
 /* Phase 2 — batch export */
@@ -3740,7 +3742,7 @@ input[type="range"]:disabled {
 }
 
 .batch-empty {
-  color: #6a8a82;
+  color: var(--faint);
   font-size: 0.88rem;
   padding: 0.5rem 0;
 }
@@ -3818,7 +3820,7 @@ input[type="range"]:disabled {
 .share-note {
   margin-top: 1.25rem;
   font-size: 0.82rem;
-  color: #6a8a82;
+  color: var(--faint);
 }
 
 .share-note a {
