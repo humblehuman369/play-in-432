@@ -69,3 +69,6 @@ store-assets/walkthrough-video/normalized/
 store-assets/walkthrough-video/captioned/
 store-assets/walkthrough-video/clips/
 store-assets/walkthrough-video/*.txt
+
+# Local Claude Code config / dev helpers (machine-specific)
+.claude/
