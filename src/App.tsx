@@ -156,6 +156,7 @@ function AppMain({
     tracks: lib.tracks,
     onDurationKnown: (id, duration) => void lib.setDuration(id, duration),
     onPlayed: (id) => void lib.recordPlay(id),
+    onAddRenderedTrack: lib.addRenderedTrack,
   });
 
   const [shell, setShell] = useState<Shell>(readShell);
@@ -198,6 +199,18 @@ function AppMain({
     }
     const ok = await player.downloadRetuned();
     if (ok) recordHqExport();
+  }, [pro.exportGate.ok, player, openUpgrade]);
+
+  const requestSaveCopyToLibrary = useCallback(async () => {
+    if (!pro.exportGate.ok) {
+      openUpgrade("export");
+      return;
+    }
+    const ok = await player.exportRetunedToLibrary();
+    if (ok) {
+      recordHqExport();
+      setTab("library");
+    }
   }, [pro.exportGate.ok, player, openUpgrade]);
 
   const enterApp = useCallback((nextTab: Tab = "player") => {
@@ -885,11 +898,13 @@ function AppMain({
                       : activeTrack
                         ? [
                             activeTrack.artist,
-                            player.settings.mode === "retuned"
-                              ? player.settings.retuneStyle === "reanchor"
-                                ? `Re-anchor ${Math.round(player.settings.targetA)} Hz · ${formatCents(cents)} · A≈${Math.round(impliedA)}`
-                                : `A=${Math.round(player.settings.sourceA)} → A=${Math.round(player.settings.targetA)} · ${formatCents(cents)}`
-                              : "Original concert pitch",
+                            activeTrack.bakedRetune
+                              ? `${BRAND.techMark} ${activeTrack.savedTargetHz ?? Math.round(player.settings.targetA)} Hz copy · baked`
+                              : player.settings.mode === "retuned"
+                                ? player.settings.retuneStyle === "reanchor"
+                                  ? `Re-anchor ${Math.round(player.settings.targetA)} Hz · ${formatCents(cents)} · A≈${Math.round(impliedA)}`
+                                  : `A=${Math.round(player.settings.sourceA)} → A=${Math.round(player.settings.targetA)} · ${formatCents(cents)}`
+                                : "Original concert pitch",
                           ]
                             .filter(Boolean)
                             .join(" · ")
@@ -996,6 +1011,7 @@ function AppMain({
               />
 
               {activeTrack &&
+                !activeTrack.bakedRetune &&
                 player.settings.mode === "retuned" &&
                 (() => {
                   const savedHz = activeTrack.savedTargetHz;
@@ -1304,6 +1320,26 @@ function AppMain({
                       )}
                     </>
                   )}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost sm"
+                  disabled={
+                    !activeTrack ||
+                    player.exporting ||
+                    player.loading ||
+                    player.settings.mode !== "retuned" ||
+                    activeTrack.bakedRetune
+                  }
+                  onClick={() => void requestSaveCopyToLibrary()}
+                  title={
+                    activeTrack?.bakedRetune
+                      ? "This is already a retuned copy"
+                      : `Render this retune and keep it in your Library as a ${Math.round(player.settings.targetA)} Hz track`
+                  }
+                >
+                  <Bookmark size={14} />
+                  Save copy to Library
                 </button>
               </div>
 

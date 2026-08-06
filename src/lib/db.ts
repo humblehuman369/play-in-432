@@ -1,4 +1,10 @@
-import type { Playlist, PlayerSettings, TrackMeta, TrackRecord } from "./types";
+import type {
+  Playlist,
+  PlayerSettings,
+  RetuneStyle,
+  TrackMeta,
+  TrackRecord,
+} from "./types";
 import {
   cleanTrackName,
   DEFAULT_SETTINGS,
@@ -110,6 +116,7 @@ function metaFromStored(raw: Partial<TrackRecord> & { id: string }): TrackMeta {
       raw.savedRetuneStyle === "concert" || raw.savedRetuneStyle === "reanchor"
         ? raw.savedRetuneStyle
         : null,
+    bakedRetune: Boolean(raw.bakedRetune),
   };
 }
 
@@ -215,6 +222,11 @@ export type NewTrackInput = {
   artist?: string | null;
   album?: string | null;
   artworkBlob?: Blob | null;
+  /** Seed a saved retune target (used by rendered-copy imports). */
+  savedTargetHz?: number | null;
+  savedRetuneStyle?: RetuneStyle | null;
+  /** Mark the audio as already-retuned (plays original, no re-pitch). */
+  bakedRetune?: boolean;
 };
 
 /**
@@ -329,8 +341,9 @@ export async function addTracksFromFiles(
         artist: input?.artist ?? null,
         album: input?.album ?? null,
         hasArtwork: Boolean(artworkBlob),
-        savedTargetHz: null,
-        savedRetuneStyle: null,
+        savedTargetHz: input?.savedTargetHz ?? null,
+        savedRetuneStyle: input?.savedRetuneStyle ?? null,
+        bakedRetune: input?.bakedRetune ?? false,
         blob,
         artworkBlob,
       };
@@ -394,6 +407,7 @@ export async function updateTrackMeta(
       | "hasArtwork"
       | "savedTargetHz"
       | "savedRetuneStyle"
+      | "bakedRetune"
     >
   > & { artworkBlob?: Blob | null },
 ): Promise<TrackMeta | null> {

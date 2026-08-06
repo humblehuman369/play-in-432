@@ -19,6 +19,12 @@ export type TrackMeta = {
   savedTargetHz: number | null;
   /** Retune style saved alongside savedTargetHz. null = follow global. */
   savedRetuneStyle: RetuneStyle | null;
+  /**
+   * True when this track's audio is ALREADY retuned (a rendered HQ copy).
+   * Such tracks play at original pitch — never live-retuned again (no
+   * double-retune) — but are still tagged by savedTargetHz for the Library.
+   */
+  bakedRetune: boolean;
 };
 
 export type TrackRecord = TrackMeta & {
@@ -172,6 +178,7 @@ export function normalizeTrackRecord(raw: TrackRecord): TrackRecord {
     hasArtwork: raw.hasArtwork ?? Boolean(raw.artworkBlob),
     savedTargetHz: raw.savedTargetHz ?? null,
     savedRetuneStyle: raw.savedRetuneStyle ?? null,
+    bakedRetune: raw.bakedRetune ?? false,
     artworkBlob: raw.artworkBlob ?? null,
   };
 }
@@ -193,5 +200,6 @@ export function trackMetaFromRecord(record: TrackRecord): TrackMeta {
     hasArtwork: Boolean(r.artworkBlob) || r.hasArtwork,
     savedTargetHz: r.savedTargetHz ?? null,
     savedRetuneStyle: r.savedRetuneStyle ?? null,
+    bakedRetune: r.bakedRetune ?? false,
   };
 }

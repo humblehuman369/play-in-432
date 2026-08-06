@@ -202,6 +202,34 @@ export function useLibrary() {
     [refresh],
   );
 
+  /** Import an already-retuned (baked) render as a new frequency-tagged track. */
+  const addRenderedTrack = useCallback(
+    async (
+      blob: Blob,
+      opts: {
+        name: string;
+        targetHz: number;
+        retuneStyle: RetuneStyle;
+        format: "wav" | "mp3";
+      },
+    ) => {
+      const ext = opts.format === "mp3" ? "mp3" : "wav";
+      const [meta] = await db.addTracksFromFiles([
+        {
+          file: blob,
+          fileName: `${opts.name}.${ext}`,
+          name: opts.name,
+          savedTargetHz: opts.targetHz,
+          savedRetuneStyle: opts.retuneStyle,
+          bakedRetune: true,
+        },
+      ]);
+      await refresh();
+      return meta ?? null;
+    },
+    [refresh],
+  );
+
   /** Persist a retune target onto a track (or clear it with null). */
   const saveTargetToTrack = useCallback(
     async (
@@ -313,6 +341,7 @@ export function useLibrary() {
     toggleFavorite,
     removeTrack,
     saveTargetToTrack,
+    addRenderedTrack,
     createPlaylist,
     createPlaylistWithTracks,
     renamePlaylist,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PlayerEngine, type PlayMode } from "../lib/playerEngine";
 import * as db from "../lib/db";
-import { exportRetunedFile } from "../lib/exportRetune";
+import { exportRetunedFile, renderRetunedBlob } from "../lib/exportRetune";
 import {
   bindMediaSessionHandlers,
   updateMediaSessionMetadata,
@@ -26,9 +26,24 @@ type Args = {
   tracks: TrackMeta[];
   onDurationKnown?: (id: string, duration: number) => void;
   onPlayed?: (id: string) => void;
+  /** Persist a rendered (baked) retune copy as a new Library track. */
+  onAddRenderedTrack?: (
+    blob: Blob,
+    opts: {
+      name: string;
+      targetHz: number;
+      retuneStyle: RetuneStyle;
+      format: "wav" | "mp3";
+    },
+  ) => Promise<unknown>;
 };
 
-export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args) {
+export function usePlayerController({
+  tracks,
+  onDurationKnown,
+  onPlayed,
+  onAddRenderedTrack,
+}: Args) {
   const engineRef = useRef<PlayerEngine | null>(null);
   const queueRef = useRef<string[]>([]);
   const activeIdRef = useRef<string | null>(null);
@@ -227,8 +242,13 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine) return;
+    // A baked (already-retuned) copy must never be re-pitched, even when an
+    // unrelated setting (volume, bed) changes while it is the active track.
+    const activeBaked = Boolean(
+      tracksRef.current.find((t) => t.id === activeIdRef.current)?.bakedRetune,
+    );
     engine.setVolume(settings.volume);
-    engine.setMode(settings.mode);
+    engine.setMode(activeBaked ? "original" : settings.mode);
     engine.setRetuneStyle(settings.retuneStyle);
     engine.setPitchTargets(settings.sourceA, settings.targetA);
     engine.setBedEnabled(settings.bedOn);
@@ -297,21 +317,33 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
         await engine.loadArrayBuffer(data);
 
         const s = settingsRef.current;
-        // Per-track saved tuning (if any) takes precedence over the global
-        // default and is reflected back into the live controls so the header,
-        // now-playing line, and frequency strip stay a single source of truth.
+        // Per-track tuning takes precedence over the global default and is
+        // reflected back into the live controls so the header, now-playing
+        // line, and frequency strip stay a single source of truth.
+        // A baked (already-retuned) copy plays ORIGINAL so it is never
+        // re-pitched on top of its rendered tuning.
         const savedHz = rec.savedTargetHz;
         const savedStyle = rec.savedRetuneStyle;
-        const effTarget = savedHz != null ? savedHz : s.targetA;
+        const baked = rec.bakedRetune;
+        const effMode: PlayMode = baked
+          ? "original"
+          : savedHz != null
+            ? "retuned"
+            : s.mode;
+        const effTarget = !baked && savedHz != null ? savedHz : s.targetA;
         const effStyle: RetuneStyle = savedStyle ?? s.retuneStyle;
-        const effMode: PlayMode = savedHz != null ? "retuned" : s.mode;
         engine.setMode(effMode);
         engine.setRetuneStyle(effStyle);
         engine.setPitchTargets(s.sourceA, effTarget);
         engine.setVolume(s.volume);
         engine.setBedEnabled(s.bedOn);
         engine.setBedLevel(s.bedLevel);
+        // A live-saved target is reflected into the global controls (so the
+        // strip/header edit the active track). A BAKED copy is NOT reflected —
+        // it plays original at the engine only, leaving the user's global
+        // retune default intact so the next normal track still retunes.
         if (
+          !baked &&
           savedHz != null &&
           (effTarget !== s.targetA ||
             effStyle !== s.retuneStyle ||
@@ -710,6 +742,72 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
     }
   }, [tracks]);
 
+  /**
+   * Render the active track at the current target and save the retuned copy
+   * back into the Library as a new (baked) frequency-tagged track.
+   */
+  const exportRetunedToLibrary = useCallback(async (): Promise<boolean> => {
+    const id = activeIdRef.current;
+    if (!id) {
+      setError("Load a track first, then save a retuned copy.");
+      return false;
+    }
+    if (!onAddRenderedTrack) return false;
+    const track = tracks.find((t) => t.id === id);
+    const s = settingsRef.current;
+    const format = s.exportFormat === "mp3" ? "mp3" : "wav";
+    setExporting(true);
+    setExportProgress(0);
+    setExportStatus("Rendering retuned copy…");
+    setExportEngine(null);
+    setError(null);
+    try {
+      const rec = await db.getTrack(id);
+      if (!rec) throw new Error("Track not found in library");
+      const data = await rec.blob.arrayBuffer();
+      const { blob, engine, usedFallback } = await renderRetunedBlob({
+        arrayBuffer: data,
+        trackName: track?.name ?? rec.name,
+        sourceA: s.sourceA,
+        targetA: s.targetA,
+        retuneStyle: s.retuneStyle,
+        bedOn: s.bedOn,
+        bedLevel: s.bedLevel,
+        format,
+        onProgress: (f, status) => {
+          if (typeof f === "number" && f >= 0) setExportProgress(f);
+          if (status) setExportStatus(status);
+        },
+      });
+      setExportEngine(engine);
+      const baseName = track?.name ?? rec.name;
+      await onAddRenderedTrack(blob, {
+        name: `${baseName} (${Math.round(s.targetA)} Hz)`,
+        targetHz: Math.round(s.targetA),
+        retuneStyle: s.retuneStyle,
+        format,
+      });
+      if (usedFallback) {
+        setError(
+          "HQ TrueHz Convert was unavailable — saved a preview-quality copy. Try again for full quality.",
+        );
+      }
+      return true;
+    } catch (e) {
+      console.error(e);
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Could not render a retuned copy. Try a shorter track or WAV source.",
+      );
+      return false;
+    } finally {
+      setExporting(false);
+      setExportProgress(0);
+      setExportStatus(null);
+    }
+  }, [tracks, onAddRenderedTrack]);
+
   const onTrackRemoved = useCallback(
     (id: string) => {
       const nextQueue = queueRef.current.filter((x) => x !== id);
@@ -775,6 +873,7 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
     dismissPitchEstimate,
     redetectPitch,
     downloadRetuned,
+    exportRetunedToLibrary,
     onTrackRemoved,
     sleepRemainingSec,
     sleepMinutes,

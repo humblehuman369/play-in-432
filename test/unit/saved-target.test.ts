@@ -79,6 +79,30 @@ describe("per-track saved retune target", () => {
     expect(meta.savedRetuneStyle).toBe("reanchor");
   });
 
+  it("defaults bakedRetune to false and round-trips a baked rendered copy", async () => {
+    const id = await seedTrack();
+    const fresh = (await listTracks()).find((t) => t.id === id)!;
+    expect(fresh.bakedRetune).toBe(false);
+
+    // Simulate the rendered-copy import path (addRenderedTrack).
+    const [copy] = await addTracksFromFiles([
+      {
+        file: new Blob([new Uint8Array([7, 7, 7, 7])], { type: "audio/wav" }),
+        fileName: "Song (528 Hz).wav",
+        name: "Song (528 Hz)",
+        savedTargetHz: 528,
+        savedRetuneStyle: "concert",
+        bakedRetune: true,
+      },
+    ]);
+    expect(copy.savedTargetHz).toBe(528);
+    expect(copy.bakedRetune).toBe(true);
+
+    const rec = await getTrack(copy.id);
+    expect(rec?.bakedRetune).toBe(true);
+    expect(rec?.savedTargetHz).toBe(528);
+  });
+
   it("clears the saved target (and its style) when set back to null", async () => {
     const id = await seedTrack();
     await updateTrackMeta(id, {

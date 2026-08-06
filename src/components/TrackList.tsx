@@ -183,10 +183,15 @@ export function TrackList({
                     {t.savedTargetHz != null && (
                       <span
                         className="tsub-freq"
-                        title={`Saved to play at ${Math.round(t.savedTargetHz)} Hz`}
+                        title={
+                          t.bakedRetune
+                            ? `Rendered ${Math.round(t.savedTargetHz)} Hz copy (plays as-is)`
+                            : `Saved to play at ${Math.round(t.savedTargetHz)} Hz`
+                        }
                       >
                         {" · "}
                         {Math.round(t.savedTargetHz)} Hz
+                        {t.bakedRetune ? " copy" : ""}
                       </span>
                     )}
                   </span>

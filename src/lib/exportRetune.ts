@@ -510,7 +510,7 @@ export function retunedDownloadName(
  * Decode blob → TrueHz Convert HQ retune → WAV or MP3 download.
  * Optional TrueHz pure-tone bed mixed when bedOn is true.
  */
-export async function exportRetunedFile(opts: {
+export type RenderRetunedOpts = {
   arrayBuffer: ArrayBuffer;
   trackName: string;
   sourceA: number;
@@ -522,7 +522,15 @@ export async function exportRetunedFile(opts: {
   /** Output container after HQ retune (default WAV). */
   format?: ExportFormat;
   onProgress?: (fraction: number, status?: string) => void;
-}): Promise<ExportResult> {
+};
+
+/**
+ * Decode blob → TrueHz Convert HQ retune → encode WAV/MP3 and return the blob.
+ * Shared by the download path and the "add rendered copy to Library" path.
+ */
+export async function renderRetunedBlob(
+  opts: RenderRetunedOpts,
+): Promise<ExportResult & { blob: Blob }> {
   const ctx = new AudioContext();
   const style = opts.retuneStyle ?? "concert";
   const format: ExportFormat = opts.format === "mp3" ? "mp3" : "wav";
@@ -541,11 +549,7 @@ export async function exportRetunedFile(opts: {
     let finalBuf = rendered;
     if (opts.bedOn && (opts.bedLevel ?? 0) > 0) {
       opts.onProgress?.(0.97, `${BRAND.bedLabel}…`);
-      finalBuf = mixTrueHzBed(
-        rendered,
-        opts.targetA,
-        opts.bedLevel ?? 0.04,
-      );
+      finalBuf = mixTrueHzBed(rendered, opts.targetA, opts.bedLevel ?? 0.04);
     }
 
     let blob: Blob;
@@ -558,22 +562,26 @@ export async function exportRetunedFile(opts: {
       opts.onProgress?.(0.99, "Encoding WAV…");
       blob = audioBufferToWavBlob(finalBuf);
     }
-
-    triggerDownload(
-      blob,
-      retunedDownloadName(
-        opts.trackName,
-        opts.sourceA,
-        opts.targetA,
-        engine,
-        format,
-      ),
-    );
-    opts.onProgress?.(1, "Done");
-    return { engine, usedFallback, format };
+    return { blob, engine, usedFallback, format };
   } finally {
     await ctx.close();
   }
+}
+
+/**
+ * Decode blob → TrueHz Convert HQ retune → WAV or MP3 download.
+ * Optional TrueHz pure-tone bed mixed when bedOn is true.
+ */
+export async function exportRetunedFile(
+  opts: RenderRetunedOpts,
+): Promise<ExportResult> {
+  const { blob, engine, usedFallback, format } = await renderRetunedBlob(opts);
+  triggerDownload(
+    blob,
+    retunedDownloadName(opts.trackName, opts.sourceA, opts.targetA, engine, format),
+  );
+  opts.onProgress?.(1, "Done");
+  return { engine, usedFallback, format };
 }
 
 /** @deprecated Prefer exportRetunedFile — same HQ path, WAV only. */
