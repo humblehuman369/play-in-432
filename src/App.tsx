@@ -443,6 +443,9 @@ function AppMain({
     player.settings.targetA,
     player.settings.retuneStyle,
   );
+  // Before any music is imported, the retune-status chips describe a retune
+  // that can't happen yet, and monetization shouldn't outrank the first aha.
+  const hasTracks = lib.tracks.length > 0;
 
   const onDropFiles = (e: React.DragEvent) => {
     e.preventDefault();
@@ -648,18 +651,22 @@ function AppMain({
           ) : (
             <button
               type="button"
-              className="badge pro-upgrade-badge"
+              className={`badge pro-upgrade-badge ${hasTracks ? "" : "subtle"}`}
               onClick={() => openUpgrade("general")}
             >
               <Crown size={12} /> Upgrade
             </button>
           )}
-          <span className="badge">
-            {player.settings.retuneStyle === "reanchor"
-              ? `Re-anchor ${Math.round(player.settings.targetA)} · A≈${Math.round(impliedA)}`
-              : `A=${Math.round(player.settings.sourceA)} → A=${Math.round(player.settings.targetA)}`}
-          </span>
-          <span className="badge muted">{formatCents(cents)}</span>
+          {hasTracks && (
+            <>
+              <span className="badge">
+                {player.settings.retuneStyle === "reanchor"
+                  ? `Re-anchor ${Math.round(player.settings.targetA)} · A≈${Math.round(impliedA)}`
+                  : `A=${Math.round(player.settings.sourceA)} → A=${Math.round(player.settings.targetA)}`}
+              </span>
+              <span className="badge muted">{formatCents(cents)}</span>
+            </>
+          )}
         </div>
       </header>
 
