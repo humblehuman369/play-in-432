@@ -246,7 +246,7 @@
 .learn-disclaimer {
   margin: 0.25rem 0 0;
   font-size: 0.78rem;
-  color: #5a726b;
+  color: #6f8a82;
   line-height: 1.45;
 }
 
@@ -426,12 +426,10 @@
 }
 
 @media (max-width: 640px) {
-  .tabs {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
   .tabs button {
+    flex: 0 0 auto; /* natural width; strip scrolls horizontally when tabs overflow */
     font-size: 0.8rem;
+    padding: 0.55rem 0.6rem;
   }
 
   .learn-principles {
@@ -441,17 +439,26 @@
 
 /* ── Tabs ───────────────────────────────────────────────────── */
 .tabs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   gap: 0.3rem;
   padding: 0.3rem;
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border);
   margin-bottom: 1.15rem;
+  scrollbar-width: none; /* Firefox */
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none; /* WebKit — strip scrolls without a visible bar */
 }
 
 .tabs button {
+  flex: 1 0 auto;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -462,7 +469,7 @@
   font: inherit;
   font-weight: 600;
   font-size: 0.82rem;
-  padding: 0.55rem 0.35rem;
+  padding: 0.55rem 0.7rem;
   border-radius: 10px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
@@ -487,6 +494,13 @@
 
 .tabs button.active .tab-count {
   opacity: 0.85;
+}
+
+/* Accessible placeholder color (default UA placeholder is too faint on dark). */
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted); /* #8aa8a0 → 7.3:1 on --panel, passes WCAG AA */
+  opacity: 1; /* Firefox dims placeholders by default; keep full color */
 }
 
 /* ── Main ───────────────────────────────────────────────────── */
@@ -1283,7 +1297,7 @@ input[type="range"]:disabled {
 .footer {
   margin-top: 1.75rem;
   text-align: center;
-  color: #5a726b;
+  color: #6f8a82;
   font-size: 0.78rem;
 }
 
@@ -1526,7 +1540,7 @@ input[type="range"]:disabled {
 }
 
 .drag-handle {
-  color: #5a726b;
+  color: #6f8a82;
   cursor: grab;
   display: grid;
   place-items: center;
