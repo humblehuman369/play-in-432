@@ -25,6 +25,17 @@ export const RC_ENTITLEMENT_ID = RC_ENTITLEMENT_PRO;
 
 export const RC_OFFERING_ID = "default";
 
+/** Product-loading must never hang the purchase UI (App Store 2.1b). */
+const OFFERINGS_TIMEOUT_MS = 15000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer)) as Promise<T>;
+}
+
 function iosKey(): string {
   return (
     (import.meta.env.VITE_REVENUECAT_IOS_API_KEY as string | undefined)?.trim() ||
@@ -129,7 +140,11 @@ export async function getPackages(): Promise<PackageInfo[]> {
   if (!configured && !(await initRevenueCat())) return [];
 
   const { Purchases } = await import("@revenuecat/purchases-capacitor");
-  const offerings = await Purchases.getOfferings();
+  const offerings = await withTimeout(
+    Purchases.getOfferings(),
+    OFFERINGS_TIMEOUT_MS,
+    "Store products didn’t load. Check your connection and try again.",
+  );
   const current =
     offerings.current ||
     offerings.all?.[RC_OFFERING_ID] ||
@@ -185,22 +200,26 @@ export async function purchasePackage(pkg: PackageInfo): Promise<boolean> {
   }
 }
 
-/** Prefer lifetime Pro, then yearly, monthly. Never falls back to Lite. */
+/** One-time lifetime Pro (no subscriptions). Never falls back to Lite. */
 export async function purchaseDefaultPro(): Promise<boolean> {
   const packages = await getPackages();
   if (!packages.length) {
+    console.warn(
+      "[Pro] No RevenueCat packages in the current offering — check the dashboard offering + App Store Connect product status.",
+    );
     throw new Error(
-      "No packages available. Configure offerings in the RevenueCat dashboard (see store-assets/REVENUECAT.md).",
+      "Purchases are temporarily unavailable. Please try again later.",
     );
   }
   const pick =
     packages.find((p) => p.key === "lifetime") ||
-    packages.find((p) => p.key === "yearly") ||
-    packages.find((p) => p.key === "monthly") ||
     packages.find((p) => p.tier === "pro");
   if (!pick) {
+    console.warn(
+      "[Pro] No Pro package in the current offering — add com.playin432.app.truehz_pro to RevenueCat.",
+    );
     throw new Error(
-      "No Pro package in the current offering. Add com.playin432.app.truehz_pro (and optional subs) to RevenueCat.",
+      "Purchases are temporarily unavailable. Please try again later.",
     );
   }
   return purchasePackage(pick);

@@ -2,12 +2,12 @@
 
 ## Products (create in App Store Connect if missing)
 
+One-time (non-consumable) only — **no subscriptions**.
+
 | Type | Product ID | Price (USA) | Tier |
 |------|------------|-------------|------|
 | **Non-Consumable** Lite | `com.playin432.app.truehz_lite` | **$9.99** | Lite |
 | **Non-Consumable** Pro lifetime | `com.playin432.app.truehz_pro` | **$19.99** | Pro |
-| Auto-renewable monthly | `com.playin432.app.truehz_pro.monthly` | **$4.99**/mo | Pro |
-| Auto-renewable yearly | `com.playin432.app.truehz_pro.yearly` | **$29.99**/yr | Pro |
 
 ## Create Lite in App Store Connect
 
@@ -34,7 +34,7 @@ Manual checklist:
 2. **Entitlements**:
    - `truehz_lite` → attach Lite product  
    - `truehz_pro` → attach all Pro products  
-3. **Offering** `default` (Current): packages `lite` + `lifetime` (+ monthly/yearly if kept)  
+3. **Offering** `default` (Current): packages `lite` + `lifetime` only (no subscriptions)  
 4. Wire **In-App Purchase .p8** on the iOS app (bundle `com.playin432.app`)  
 5. Copy public `appl_…` key → `.env` `VITE_REVENUECAT_IOS_API_KEY` → `npm run mobile:sync`
 

@@ -496,20 +496,18 @@ export async function startCheckout(
 
   const rc = await import("./revenueCat");
   if (rc.isRevenueCatNative()) {
-    try {
-      const ok = await rc.purchaseTier(tier);
-      if (!ok) {
-        throw new Error("Purchase completed but access was not unlocked.");
-      }
-      return;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (/cancel/i.test(msg)) throw e;
-      // Missing package / RC misconfig → Stripe so unlock still works
-      console.warn("[Pro] RevenueCat purchase failed, trying Stripe:", msg);
-      await startCheckoutStripe(opts);
-      return;
+    // Native (iOS/Android) MUST use StoreKit / Play Billing for digital
+    // unlocks. Never fall back to external Stripe web checkout: it violates
+    // App Store Guideline 3.1.1 and presents as an indefinite loading spinner
+    // in review. On failure, surface the error to the UI (Restore is offered
+    // separately) rather than redirecting off-platform.
+    const ok = await rc.purchaseTier(tier);
+    if (!ok) {
+      throw new Error(
+        "Purchase didn’t unlock access. If you were charged, tap Restore Purchases.",
+      );
     }
+    return;
   }
   await startCheckoutStripe(opts);
 }

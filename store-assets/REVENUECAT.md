@@ -15,9 +15,7 @@ Native IAP goes through **RevenueCat**. Web still uses **Stripe**.
 ```bash
 cd truehz-player
 export REVENUECAT_SECRET_API_KEY='sk_…'   # V2 secret — never commit
-node scripts/setup-revenuecat.mjs
-# optional: only lifetime products (no monthly/yearly)
-# REVENUECAT_SKIP_SUBS=1 node scripts/setup-revenuecat.mjs
+node scripts/setup-revenuecat.mjs   # creates Lite + Pro lifetime (no subscriptions)
 ```
 
 The script creates products, entitlements, packages, writes `.secrets/revenuecat-setup.json`, and updates `.env` with `VITE_REVENUECAT_IOS_API_KEY` when the public key is available.
@@ -50,17 +48,17 @@ Without this, offerings may be empty on device and purchases fail.
 |------------|------|-------------|-----------|
 | `com.playin432.app.truehz_lite` | Non-consumable | $9.99 | READY_TO_SUBMIT |
 | `com.playin432.app.truehz_pro` | Non-consumable | ~$19.99 | READY_TO_SUBMIT |
-| `com.playin432.app.truehz_pro.monthly` | Auto-renewable (optional) | $4.99/mo | create if you want subs |
-| `com.playin432.app.truehz_pro.yearly` | Auto-renewable (optional) | $29.99/yr | create if you want subs |
 
-Primary launch path: **Lite + Pro lifetime only**. Subs are optional.
+One-time only — **no subscriptions**. The auto-renewable monthly/yearly Pro
+products were removed from the app (they contradicted the "one-time" promise
+and blocked App Store review). Do not re-add them to the offering.
 
 ## 4. Entitlements (must match code)
 
 | Lookup key | Products |
 |------------|----------|
 | `truehz_lite` | `…truehz_lite` |
-| `truehz_pro` | `…truehz_pro` (+ monthly/yearly if any) |
+| `truehz_pro` | `…truehz_pro` |
 
 Code: `src/lib/revenueCat.ts` — Pro implies full access; Lite = frequencies + 10 HQ/month.
 
@@ -69,9 +67,9 @@ Code: `src/lib/revenueCat.ts` — Pro implies full access; Lite = frequencies + 
 | Field | Value |
 |-------|--------|
 | Lookup key | `default` (Current) |
-| Packages | `lite` → Lite product, `lifetime` → Pro lifetime, optional `monthly` / `yearly` |
+| Packages | `lite` → Lite product, `lifetime` → Pro lifetime (no subscriptions) |
 
-App prefers packages in order: **lifetime → yearly → monthly** for Pro; **lite** for Lite.
+App picks the `lifetime` package for Pro and `lite` for Lite.
 
 ## 6. API keys → app env
 

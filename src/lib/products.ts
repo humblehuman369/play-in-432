@@ -2,6 +2,12 @@
  * App Store / Play Billing product catalog for TrueHz Lite + Pro.
  * Must match App Store Connect + RevenueCat product IDs exactly.
  *
+ * ONE-TIME (non-consumable) only — no subscriptions. The auto-renewable
+ * monthly/yearly Pro products were removed (they contradicted the "one-time,
+ * no subscription" product promise and blocked App Store review). If they are
+ * ever reintroduced, they must be configured + submitted in App Store Connect
+ * and re-added to the RevenueCat offering.
+ *
  * RevenueCat entitlements:
  *   truehz_lite  — all frequencies + monthly HQ cap
  *   truehz_pro   — full Pro (implies lite features)
@@ -26,22 +32,6 @@ export const IAP_PRODUCTS = {
     priceHint: "$19.99",
     description:
       "All frequencies + unlimited TrueHz Convert HQ + batch export. One-time.",
-    tier: "pro" as const,
-  },
-  monthly: {
-    id: "com.playin432.app.truehz_pro.monthly",
-    type: "auto_renewable" as const,
-    label: "TrueHz Pro Monthly",
-    priceHint: "$4.99/mo",
-    description: "All frequencies + unlimited HQ. Cancel anytime.",
-    tier: "pro" as const,
-  },
-  yearly: {
-    id: "com.playin432.app.truehz_pro.yearly",
-    type: "auto_renewable" as const,
-    label: "TrueHz Pro Yearly",
-    priceHint: "$29.99/yr",
-    description: "All frequencies + unlimited HQ. Best value yearly.",
     tier: "pro" as const,
   },
 } as const;

@@ -5,9 +5,9 @@
  * Creates / reuses:
  *   - Project (Play In 432)
  *   - iOS app (bundle com.playin432.app)
- *   - Products: Lite + Pro lifetime (+ optional monthly/yearly)
+ *   - Products: Lite + Pro lifetime (one-time only — no subscriptions)
  *   - Entitlements: truehz_lite, truehz_pro
- *   - Offering: default (current) with packages lite, lifetime, monthly, yearly
+ *   - Offering: default (current) with packages lite, lifetime
  *   - Writes public API keys hint to .secrets/revenuecat-setup.json
  *
  * Usage:
@@ -47,8 +47,7 @@ Missing REVENUECAT_SECRET_API_KEY.
   process.exit(1);
 }
 
-const SKIP_SUBS = process.env.REVENUECAT_SKIP_SUBS === "1";
-
+// One-time (non-consumable) only — no subscriptions.
 const PRODUCT_DEFS = [
   {
     store_identifier: "com.playin432.app.truehz_lite",
@@ -64,26 +63,6 @@ const PRODUCT_DEFS = [
     package_key: "lifetime",
     entitlement: "truehz_pro",
   },
-  ...(SKIP_SUBS
-    ? []
-    : [
-        {
-          store_identifier: "com.playin432.app.truehz_pro.monthly",
-          type: "subscription",
-          display_name: "TrueHz Pro Monthly",
-          duration: "P1M",
-          package_key: "monthly",
-          entitlement: "truehz_pro",
-        },
-        {
-          store_identifier: "com.playin432.app.truehz_pro.yearly",
-          type: "subscription",
-          display_name: "TrueHz Pro Yearly",
-          duration: "P1Y",
-          package_key: "yearly",
-          entitlement: "truehz_pro",
-        },
-      ]),
 ];
 
 function request(method, urlPath, body) {
@@ -381,7 +360,7 @@ async function main() {
   const offeringId = await ensureOffering(projectId);
   if (offeringId) {
     let pos = 1;
-    for (const key of ["lite", "lifetime", "monthly", "yearly"]) {
+    for (const key of ["lite", "lifetime"]) {
       const entry = productByKey[key];
       if (!entry) continue;
       await ensurePackage(
