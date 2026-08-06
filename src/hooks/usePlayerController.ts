@@ -297,12 +297,33 @@ export function usePlayerController({ tracks, onDurationKnown, onPlayed }: Args)
         await engine.loadArrayBuffer(data);
 
         const s = settingsRef.current;
-        engine.setMode(s.mode);
-        engine.setRetuneStyle(s.retuneStyle);
-        engine.setPitchTargets(s.sourceA, s.targetA);
+        // Per-track saved tuning (if any) takes precedence over the global
+        // default and is reflected back into the live controls so the header,
+        // now-playing line, and frequency strip stay a single source of truth.
+        const savedHz = rec.savedTargetHz;
+        const savedStyle = rec.savedRetuneStyle;
+        const effTarget = savedHz != null ? savedHz : s.targetA;
+        const effStyle: RetuneStyle = savedStyle ?? s.retuneStyle;
+        const effMode: PlayMode = savedHz != null ? "retuned" : s.mode;
+        engine.setMode(effMode);
+        engine.setRetuneStyle(effStyle);
+        engine.setPitchTargets(s.sourceA, effTarget);
         engine.setVolume(s.volume);
         engine.setBedEnabled(s.bedOn);
         engine.setBedLevel(s.bedLevel);
+        if (
+          savedHz != null &&
+          (effTarget !== s.targetA ||
+            effStyle !== s.retuneStyle ||
+            effMode !== s.mode)
+        ) {
+          setSettings((prev) => ({
+            ...prev,
+            mode: effMode,
+            retuneStyle: effStyle,
+            targetA: effTarget,
+          }));
+        }
 
         setDuration(engine.duration);
         if (rec.duration == null && engine.duration > 0) {

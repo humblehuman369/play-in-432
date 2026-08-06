@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Bookmark,
+  BookmarkCheck,
   BookOpen,
   Crown,
   Download,
@@ -313,6 +315,8 @@ function AppMain({
   const [libraryFilter, setLibraryFilter] = useState<"all" | "favorites">(
     "all",
   );
+  /** Optional Library filter by a track's saved retune target (Hz). */
+  const [freqFilter, setFreqFilter] = useState<number | null>(null);
 
   const activeTrack = useMemo(
     () => lib.tracks.find((t) => t.id === player.activeId) ?? null,
@@ -332,12 +336,32 @@ function AppMain({
     [selectedPlaylistId, lib.playlists],
   );
 
+  /** Distinct saved-target frequencies present in the library, ascending. */
+  const savedFreqs = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const t of lib.tracks) {
+      if (t.savedTargetHz != null) {
+        const hz = Math.round(t.savedTargetHz);
+        counts.set(hz, (counts.get(hz) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .map(([hz, count]) => ({ hz, count }))
+      .sort((a, b) => a.hz - b.hz);
+  }, [lib.tracks]);
+
   const libraryTracks = useMemo(() => {
     let list = libraryFilter === "favorites" ? favoriteTracks : lib.tracks;
     const q = query.trim().toLowerCase();
     if (q) list = list.filter((t) => t.name.toLowerCase().includes(q));
+    if (freqFilter != null)
+      list = list.filter(
+        (t) =>
+          t.savedTargetHz != null &&
+          Math.round(t.savedTargetHz) === freqFilter,
+      );
     return list;
-  }, [lib.tracks, favoriteTracks, libraryFilter, query]);
+  }, [lib.tracks, favoriteTracks, libraryFilter, query, freqFilter]);
 
   const playlistTracks = useMemo(() => {
     if (!selectedPlaylist) return [] as TrackMeta[];
@@ -753,54 +777,88 @@ function AppMain({
 
         {/* ═══════════════ PLAYER TAB (original experience) ═══════════════ */}
         {tab === "player" && (
-          <>
-            <section
-              className={`dropzone ${dragOver ? "over" : ""}`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
+          <div
+            className="player-tab"
+            onDragOver={(e) => {
+              if (!lib.tracks.length) return; // empty-state dropzone handles its own drag
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={(e) => {
+              if (!lib.tracks.length) return;
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+                setDragOver(false);
+            }}
+            onDrop={(e) => {
+              if (!lib.tracks.length) return;
+              onDropFiles(e);
+            }}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg,.webm,.aac,audio/mpeg,audio/wav,audio/x-m4a,audio/flac"
+              multiple
+              hidden
+              onChange={(e) => {
+                if (e.target.files) void handleImport(e.target.files);
+                e.target.value = "";
               }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={onDropFiles}
-              onClick={() => fileInputRef.current?.click()}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ")
-                  fileInputRef.current?.click();
-              }}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg,.webm,.aac,audio/mpeg,audio/wav,audio/x-m4a,audio/flac"
-                multiple
-                hidden
-                onChange={(e) => {
-                  if (e.target.files) void handleImport(e.target.files);
-                  e.target.value = "";
+            />
+
+            {/* Populated: full-page drag overlay only while dragging */}
+            {lib.tracks.length > 0 && dragOver && (
+              <div className="drag-overlay" aria-hidden>
+                <Upload size={30} />
+                <p>Drop to add to your library</p>
+              </div>
+            )}
+
+            {lib.tracks.length === 0 ? (
+              <section
+                className={`dropzone ${dragOver ? "over" : ""}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
                 }}
-              />
-              <Upload size={28} className="drop-icon" />
-              <h2>{lib.importing ? "Reading tags…" : "Drop music here"}</h2>
-              <p>
-                {lib.importing
-                  ? "Importing metadata and cover art"
-                  : "or click to browse · MP3, WAV, M4A, FLAC, OGG"}
-              </p>
-              {lib.tracks.length > 0 && !lib.importing && (
-                <p className="drop-hint">
-                  Saved to Library · {lib.tracks.length} track
-                  {lib.tracks.length === 1 ? "" : "s"}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={onDropFiles}
+                onClick={() => fileInputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ")
+                    fileInputRef.current?.click();
+                }}
+              >
+                <Upload size={28} className="drop-icon" />
+                <h2>{lib.importing ? "Reading tags…" : "Drop music here"}</h2>
+                <p>
+                  {lib.importing
+                    ? "Importing metadata and cover art"
+                    : "or click to browse · MP3, WAV, M4A, FLAC, OGG"}
                 </p>
-              )}
-              {lib.tracks.length === 0 && !lib.importing && (
-                <p className="drop-hint how-it-works">
-                  How it works: add a track → tap 432 (or another target) →
-                  listen live, or Download HQ.
-                </p>
-              )}
-            </section>
+                {!lib.importing && (
+                  <p className="drop-hint how-it-works">
+                    How it works: add a track → tap 432 (or another target) →
+                    listen live, or Download HQ.
+                  </p>
+                )}
+              </section>
+            ) : (
+              <button
+                type="button"
+                className="add-music-bar"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={lib.importing}
+              >
+                <Upload size={16} />
+                {lib.importing ? "Reading tags…" : "Add music"}
+                <span className="add-music-count">
+                  {lib.tracks.length} in library
+                </span>
+              </button>
+            )}
 
             {lib.tracks.length > 0 && (
             <>
@@ -936,6 +994,65 @@ function AppMain({
                   setTab("learn");
                 }}
               />
+
+              {activeTrack &&
+                player.settings.mode === "retuned" &&
+                (() => {
+                  const savedHz = activeTrack.savedTargetHz;
+                  const curHz = Math.round(player.settings.targetA);
+                  const isSaved =
+                    savedHz != null &&
+                    Math.abs(savedHz - player.settings.targetA) < 0.01 &&
+                    activeTrack.savedRetuneStyle ===
+                      player.settings.retuneStyle;
+                  return (
+                    <div className="save-target-row">
+                      {isSaved ? (
+                        <>
+                          <span className="save-target-status">
+                            <BookmarkCheck size={15} />
+                            Saved to this track · {curHz} Hz
+                          </span>
+                          <button
+                            type="button"
+                            className="btn ghost sm"
+                            onClick={() =>
+                              void lib.saveTargetToTrack(
+                                activeTrack.id,
+                                null,
+                                null,
+                              )
+                            }
+                          >
+                            Clear
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="save-target-hint">
+                            {savedHz != null
+                              ? `Currently saved at ${Math.round(savedHz)} Hz`
+                              : "Make this track always play at this target"}
+                          </span>
+                          <button
+                            type="button"
+                            className="btn primary sm"
+                            onClick={() =>
+                              void lib.saveTargetToTrack(
+                                activeTrack.id,
+                                player.settings.targetA,
+                                player.settings.retuneStyle,
+                              )
+                            }
+                          >
+                            <Bookmark size={14} />
+                            Save {curHz} Hz to track
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
 
               <div className="pitch-panel">
                 <div className="pitch-presets">
@@ -1439,7 +1556,7 @@ function AppMain({
                 Open Learn — science & honest claims
               </button>
             </section>
-          </>
+          </div>
         )}
 
         {/* ═══════════════ LEARN TAB ═══════════════ */}
@@ -1523,6 +1640,23 @@ function AppMain({
               >
                 <Heart size={13} /> Favorites ({favoriteTracks.length})
               </button>
+              {savedFreqs.length > 0 && (
+                <span className="filter-row-divider" aria-hidden />
+              )}
+              {savedFreqs.map(({ hz, count }) => (
+                <button
+                  key={hz}
+                  type="button"
+                  className={`chip ${freqFilter === hz ? "on" : ""}`}
+                  onClick={() =>
+                    setFreqFilter((cur) => (cur === hz ? null : hz))
+                  }
+                  aria-pressed={freqFilter === hz}
+                  title={`Tracks saved at ${hz} Hz`}
+                >
+                  <BookmarkCheck size={13} /> {hz} Hz ({count})
+                </button>
+              ))}
               <button
                 type="button"
                 className="btn primary sm"

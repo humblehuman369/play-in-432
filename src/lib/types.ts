@@ -12,6 +12,13 @@ export type TrackMeta = {
   artist: string | null;
   album: string | null;
   hasArtwork: boolean;
+  /**
+   * Per-track saved retune target (Hz). null = follow the global default.
+   * When set, the track loads and plays at this target automatically.
+   */
+  savedTargetHz: number | null;
+  /** Retune style saved alongside savedTargetHz. null = follow global. */
+  savedRetuneStyle: RetuneStyle | null;
 };
 
 export type TrackRecord = TrackMeta & {
@@ -163,6 +170,8 @@ export function normalizeTrackRecord(raw: TrackRecord): TrackRecord {
     artist: raw.artist ?? null,
     album: raw.album ?? null,
     hasArtwork: raw.hasArtwork ?? Boolean(raw.artworkBlob),
+    savedTargetHz: raw.savedTargetHz ?? null,
+    savedRetuneStyle: raw.savedRetuneStyle ?? null,
     artworkBlob: raw.artworkBlob ?? null,
   };
 }
@@ -182,5 +191,7 @@ export function trackMetaFromRecord(record: TrackRecord): TrackMeta {
     artist: r.artist,
     album: r.album,
     hasArtwork: Boolean(r.artworkBlob) || r.hasArtwork,
+    savedTargetHz: r.savedTargetHz ?? null,
+    savedRetuneStyle: r.savedRetuneStyle ?? null,
   };
 }

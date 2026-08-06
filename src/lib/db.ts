@@ -102,6 +102,14 @@ function metaFromStored(raw: Partial<TrackRecord> & { id: string }): TrackMeta {
     artist: raw.artist ?? null,
     album: raw.album ?? null,
     hasArtwork: Boolean(raw.hasArtwork ?? raw.artworkBlob),
+    savedTargetHz:
+      typeof raw.savedTargetHz === "number" && Number.isFinite(raw.savedTargetHz)
+        ? raw.savedTargetHz
+        : null,
+    savedRetuneStyle:
+      raw.savedRetuneStyle === "concert" || raw.savedRetuneStyle === "reanchor"
+        ? raw.savedRetuneStyle
+        : null,
   };
 }
 
@@ -321,6 +329,8 @@ export async function addTracksFromFiles(
         artist: input?.artist ?? null,
         album: input?.album ?? null,
         hasArtwork: Boolean(artworkBlob),
+        savedTargetHz: null,
+        savedRetuneStyle: null,
         blob,
         artworkBlob,
       };
@@ -382,6 +392,8 @@ export async function updateTrackMeta(
       | "artist"
       | "album"
       | "hasArtwork"
+      | "savedTargetHz"
+      | "savedRetuneStyle"
     >
   > & { artworkBlob?: Blob | null },
 ): Promise<TrackMeta | null> {

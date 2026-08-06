@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import * as db from "../lib/db";
 import { readMediaTags } from "../lib/mediaTags";
-import { cleanTrackName, type Playlist, type TrackMeta } from "../lib/types";
+import {
+  cleanTrackName,
+  type Playlist,
+  type RetuneStyle,
+  type TrackMeta,
+} from "../lib/types";
 import { isAcceptedAudioFile } from "../lib/retune";
 
 /** UX-4 duplicate key: cleaned display name + byte size. */
@@ -197,6 +202,22 @@ export function useLibrary() {
     [refresh],
   );
 
+  /** Persist a retune target onto a track (or clear it with null). */
+  const saveTargetToTrack = useCallback(
+    async (
+      id: string,
+      targetHz: number | null,
+      retuneStyle: RetuneStyle | null,
+    ) => {
+      await db.updateTrackMeta(id, {
+        savedTargetHz: targetHz,
+        savedRetuneStyle: targetHz == null ? null : retuneStyle,
+      });
+      await refresh();
+    },
+    [refresh],
+  );
+
   const createPlaylist = useCallback(
     async (name: string) => {
       const pl = await db.createPlaylist(name);
@@ -291,6 +312,7 @@ export function useLibrary() {
     setDuration,
     toggleFavorite,
     removeTrack,
+    saveTargetToTrack,
     createPlaylist,
     createPlaylistWithTracks,
     renamePlaylist,

@@ -180,6 +180,15 @@ export function TrackList({
                       ? formatTime(t.duration)
                       : formatBytes(t.size)}
                     {t.playCount > 0 ? ` · ${t.playCount} plays` : ""}
+                    {t.savedTargetHz != null && (
+                      <span
+                        className="tsub-freq"
+                        title={`Saved to play at ${Math.round(t.savedTargetHz)} Hz`}
+                      >
+                        {" · "}
+                        {Math.round(t.savedTargetHz)} Hz
+                      </span>
+                    )}
                   </span>
                 </button>
               )}
