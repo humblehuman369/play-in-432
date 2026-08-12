@@ -17,7 +17,10 @@
     "mobile:android": "npm run mobile:sync && npx cap open android",
     "mobile:run:ios": "npm run mobile:sync && npx cap run ios",
     "mobile:run:android": "npm run mobile:sync && npx cap run android",
-    "mobile:bundle:android": "npm run mobile:sync && cd android && ./gradlew bundleRelease"
+    "mobile:bundle:android": "npm run mobile:sync && cd android && ./gradlew bundleRelease",
+    "mac:sync": "npm run build && rm -rf macos/PlayIn432/PlayIn432/Resources/public && cp -R dist macos/PlayIn432/PlayIn432/Resources/public",
+    "mac:open": "open macos/PlayIn432/PlayIn432.xcodeproj",
+    "mac:build": "cd macos/PlayIn432 && xcodebuild -project PlayIn432.xcodeproj -scheme PlayIn432 -configuration Release -destination 'platform=macOS,arch=arm64' build"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",

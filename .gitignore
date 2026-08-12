@@ -72,3 +72,6 @@ store-assets/walkthrough-video/*.txt
 
 # Local Claude Code config / dev helpers (machine-specific)
 .claude/
+
+# Mac web assets (regenerate with npm run mac:sync)
+macos/PlayIn432/PlayIn432/Resources/public/

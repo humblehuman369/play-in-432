@@ -14,7 +14,7 @@
 | App Review contact + notes | Created |
 | Desktop screenshots (APP_DESKTOP) | **5 × 2880×1800** uploaded |
 | Local assets | `store-assets/screenshots/macos/` |
-| Mac **binary / build** | **Not uploaded yet** |
+| Mac **binary / build** | **1.0 (1)** uploaded & attached (`662d0498-…`) |
 
 Screenshots (order):
 
@@ -38,26 +38,46 @@ IAPs (shared with iOS):
 
 ---
 
-## What’s blocking full submission
+## Native Mac app (shipped path)
 
-There is **no macOS binary** in this repo today (Capacitor targets are **iOS + Android only**). App Store Connect macOS 1.0 cannot be submitted until you attach a Mac build.
+Capacitor’s prebuilt XCFrameworks **do not include Mac Catalyst** slices, so Catalyst is not viable today.
 
-### Recommended path: Mac Catalyst
+Instead this repo ships a **native macOS WKWebView shell**:
 
-1. Open `ios/App/App.xcodeproj` in Xcode.  
-2. Select target **App** → **General** → **Supported Destinations** → add **Mac (Designed for iPad)** *or* enable **Mac Catalyst** (Mac Catalyst gives a native Mac product for the Mac App Store listing).  
-3. For a true **Mac App Store** product under platform **MAC_OS**:
-   - Enable **Mac Catalyst** on the iOS target (or create a macOS destination).  
-   - Set **Mac Catalyst** deployment target (e.g. macOS 13+).  
-   - Signing: same Team `A2Y6C3NNSY`, bundle `com.playin432.app`.  
-   - Capabilities: App Sandbox (required for Mac App Store).  
-4. Product → **Archive** (destination: **Any Mac** / My Mac).  
-5. Distribute → **App Store Connect** → Upload.  
-6. In ASC → macOS 1.0 → select the processed build → Submit.
+| Path | Role |
+|------|------|
+| `macos/PlayIn432/` | Xcode project **PlayIn432** |
+| Bundle ID | `com.playin432.app` (same app record as iOS) |
+| Version | Marketing **1.0** · Build **1** |
+| UI | Loads bundled `public/` (same Vite web UI as mobile) |
+| Sandbox | App Sandbox + user-selected files + network client |
 
-### Alternative (no separate Mac binary)
+### Build / upload
 
-Enable **iPhone and iPad Apps on Apple Silicon Macs** availability for the **iOS** app (App Store Connect → Pricing and Availability → Apple Silicon Mac). That ships the iOS app on M‑series Macs without a MAC_OS version — different from filling the dedicated macOS 1.0 listing.
+```bash
+# Sync web UI into iOS public (source for Mac Resources)
+npm run mobile:sync
+rm -rf macos/PlayIn432/PlayIn432/Resources/public
+cp -R ios/App/App/public macos/PlayIn432/PlayIn432/Resources/public
+
+cd macos/PlayIn432
+xcodebuild -project PlayIn432.xcodeproj -scheme PlayIn432 \
+  -destination 'generic/platform=macOS' -archivePath ../../store-assets/export/PlayIn432-macOS.xcarchive \
+  -allowProvisioningUpdates DEVELOPMENT_TEAM=A2Y6C3NNSY archive
+
+# Then export/upload with ExportOptions (app-store-connect) + ASC API key
+```
+
+### Current ASC state
+
+- Build **1.0 (1)** is **VALID** and **attached** to macOS version 1.0.  
+- Listing metadata + 5 desktop screenshots are complete.  
+- You can **Submit for Review** from App Store Connect when ready.
+
+### Notes for reviewers / product
+
+- Mac shell is WKWebView (web UI). StoreKit IAP on Mac may still need a native bridge for full in-app purchase parity with iOS; free listening works without purchase.  
+- Prefer testing import + retune + play on a Mac before submit.
 
 ---
 
