@@ -16,7 +16,8 @@
     "mobile:ios": "npm run mobile:sync && npx cap open ios",
     "mobile:android": "npm run mobile:sync && npx cap open android",
     "mobile:run:ios": "npm run mobile:sync && npx cap run ios",
-    "mobile:run:android": "npm run mobile:sync && npx cap run android"
+    "mobile:run:android": "npm run mobile:sync && npx cap run android",
+    "mobile:bundle:android": "npm run mobile:sync && cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",

@@ -1,0 +1,100 @@
+{
+  "identifier" : "PlayIn432",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "A1000000000001",
+      "localizations" : [
+        {
+          "description" : "All Solfeggio & custom targets + 10 HQ exports per month. One-time.",
+          "displayName" : "TrueHz Lite",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.playin432.app.truehz_lite",
+      "referenceName" : "TrueHz Lite",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "19.99",
+      "familyShareable" : false,
+      "internalID" : "A1000000000002",
+      "localizations" : [
+        {
+          "description" : "All frequencies + unlimited TrueHz Convert HQ + batch export. One-time.",
+          "displayName" : "TrueHz Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.playin432.app.truehz_pro",
+      "referenceName" : "TrueHz Pro",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6792840657",
+    "_developerTeamID" : "A2Y6C3NNSY",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 788010000,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

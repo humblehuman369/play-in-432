@@ -1,7 +1,9 @@
-# App Store submission — Play In 432 v1.1.0 (build 11)
+# App Store submission — Play In 432 v1.1.0 (build 12)
 
-Copy/paste into App Store Connect. Addresses the Guideline 2.1(b) rejection of
-build 10 (IAP hang + un-submitted subscription products).
+Copy/paste into App Store Connect. Addresses the **August 12, 2026** rejection of
+build **11** (IAP not submitted + purchase error + UIBackgroundModes audio).
+
+**Full fix guide:** `store-assets/REJECTION_RESOLUTION_1.1.0.md`
 
 ---
 
@@ -22,39 +24,31 @@ New in 1.1.0
 
 ## App Review Notes (Notes field)
 
-Thanks for reviewing Play In 432.
+Thanks for re-reviewing Play In 432 1.1.0 (build 12).
 
-No account or login is required — the app works immediately on launch.
+CHANGES SINCE BUILD 11
+1. In-App Purchases: TrueHz Lite and TrueHz Pro (non-consumable only)
+   are submitted with this version, with review screenshots. No
+   subscriptions. Paid Apps Agreement is Active.
+2. Purchase flow: native StoreKit via RevenueCat. Sandbox-tested Unlock
+   Lite / Unlock Pro / Restore on device.
+3. Guideline 2.5.4: removed UIBackgroundModes "audio". Playback is
+   foreground Web Audio only; we do not claim persistent background audio.
 
 HOW THE APP WORKS
 Play In 432 retunes audio files the user already owns to A=432 Hz (and other
-targets). To try it, import any audio file (MP3/WAV/M4A/FLAC/OGG) via the
-"Add music" button or drag-and-drop, then tap a frequency to hear it retuned.
-The app does not stream, sell, or bundle any music — all files are provided by
-the user and never leave the device.
+targets). Import any audio file (MP3/WAV/M4A/FLAC/OGG) via "Add music", then
+tap a frequency. The app does not stream or bundle music — files stay on-device.
 
-IN-APP PURCHASES (please note the changes since build 10)
-• There are NO subscriptions. The auto-renewable monthly/yearly products
-  referenced in the previous build have been REMOVED from this binary.
-• Two one-time, non-consumable unlocks remain:
-    – TrueHz Lite  (com.playin432.app.truehz_lite,  $9.99)
-    – TrueHz Pro   (com.playin432.app.truehz_pro,  $19.99)
-• Both IAP products are submitted for review with this version, and the Paid
-  Apps Agreement is active.
-
-HOW TO TEST THE PURCHASE (the flow that failed previously)
-1. Tap "Upgrade" (crown icon, top-right) — or tap any Pro-only frequency.
-2. Choose "Unlock Pro" or "Unlock Lite". The StoreKit purchase sheet appears.
-3. Complete with a sandbox account. Purchase unlocks all frequency targets and
-   unlimited high-quality export on this device.
-• "Restore Purchases" is available in the same sheet.
-• The previous "indefinite loading" was a fallback that has been removed; if a
-  product is ever unavailable the app now shows a clear message instead of
-  hanging.
+HOW TO TEST THE PURCHASE
+1. Tap "Upgrade" (crown icon) — or tap any Pro-only frequency.
+2. Choose "Unlock Pro" ($19.99) or "Unlock Lite" ($9.99). StoreKit sheet appears.
+   Product IDs: com.playin432.app.truehz_lite · com.playin432.app.truehz_pro
+3. Complete with a sandbox account. Restore Purchases is on the same sheet.
+• Free path (no purchase): import a track and play at A=432.
 
 PRIVACY
-All audio and library data stay on-device (IndexedDB). No user files are
-uploaded to any server.
+All audio and library data stay on-device. https://playin432.com/privacy.html
 
 ---
 
@@ -75,8 +69,10 @@ TrueHz Pro — display name "TrueHz Pro"
 ---
 
 ## Pre-submit checklist
-- [ ] Paid Apps Agreement signed (Business section) — do this FIRST
-- [ ] monthly/yearly products deleted from App Store Connect + RevenueCat offering
-- [ ] truehz_lite + truehz_pro in "Ready to Submit", App Review screenshot attached
-- [ ] build 11 uploaded and attached to version 1.1.0
-- [ ] Sandbox-tested the Unlock Pro flow (StoreKit sheet appears, unlock works)
+- [ ] Paid Apps Agreement **Active** (Business) + banking/tax — do this FIRST
+- [ ] No leftover subscription products in the RevenueCat **default** offering
+- [ ] truehz_lite + truehz_pro: metadata complete, **App Review screenshot** on each
+- [ ] Both IAPs **attached to version 1.1.0** (In-App Purchases and Subscriptions)
+- [ ] `.env` has `VITE_REVENUECAT_IOS_API_KEY`; `npm run mobile:sync`; `appl_` present in ios public assets
+- [ ] build **12** uploaded and attached to version 1.1.0
+- [ ] Sandbox-tested Unlock Lite + Unlock Pro + Restore on a physical device

@@ -168,9 +168,45 @@ export async function getPackages(): Promise<PackageInfo[]> {
   });
 }
 
+function friendlyPurchaseError(e: unknown, fallback: string): Error {
+  const err = e as {
+    code?: string | number;
+    message?: string;
+    userCancelled?: boolean;
+    underlyingErrorMessage?: string;
+  };
+  const raw = `${err?.message || ""} ${err?.underlyingErrorMessage || ""}`.toLowerCase();
+  const code = String(err?.code ?? "");
+
+  if (err?.userCancelled || /cancel/i.test(code) || /cancel/i.test(raw)) {
+    return new Error("Purchase canceled.");
+  }
+  if (
+    /product.?not.?available|invalid.?product|could not be found|no products|store product/i.test(
+      raw,
+    ) ||
+    /PRODUCT_NOT_AVAILABLE|INVALID_PRODUCT|STORE_PROBLEM/i.test(code)
+  ) {
+    return new Error(
+      "This product isn’t available from the App Store yet. Please try again in a moment, or tap Restore Purchases if you already bought it.",
+    );
+  }
+  if (/network|offline|internet|timed?\s*out|timeout/i.test(raw)) {
+    return new Error("Network error talking to the App Store. Check your connection and try again.");
+  }
+  if (/not.?allowed|payment|billing|agreement|paid apps/i.test(raw)) {
+    return new Error(
+      "Purchases aren’t available on this Apple ID right now. Confirm the Paid Apps Agreement is active and try a Sandbox tester account.",
+    );
+  }
+  return new Error(err?.message || fallback);
+}
+
 export async function purchasePackage(pkg: PackageInfo): Promise<boolean> {
   if (!configured && !(await initRevenueCat())) {
-    throw new Error("RevenueCat is not configured on this build.");
+    throw new Error(
+      "In-App Purchases aren’t set up in this build. Rebuild with VITE_REVENUECAT_IOS_API_KEY, then try again.",
+    );
   }
 
   const { Purchases, PURCHASES_ERROR_CODE } = await import(
@@ -196,7 +232,7 @@ export async function purchasePackage(pkg: PackageInfo): Promise<boolean> {
     ) {
       throw new Error("Purchase canceled.");
     }
-    throw new Error(err?.message || "Purchase failed.");
+    throw friendlyPurchaseError(e, "Purchase failed. Please try again.");
   }
 }
 
@@ -208,7 +244,7 @@ export async function purchaseDefaultPro(): Promise<boolean> {
       "[Pro] No RevenueCat packages in the current offering — check the dashboard offering + App Store Connect product status.",
     );
     throw new Error(
-      "Purchases are temporarily unavailable. Please try again later.",
+      "App Store products didn’t load. Confirm TrueHz Lite/Pro are created in App Store Connect, attached to this version, and that the Paid Apps Agreement is Active — then try again.",
     );
   }
   const pick =
@@ -219,7 +255,7 @@ export async function purchaseDefaultPro(): Promise<boolean> {
       "[Pro] No Pro package in the current offering — add com.playin432.app.truehz_pro to RevenueCat.",
     );
     throw new Error(
-      "Purchases are temporarily unavailable. Please try again later.",
+      "TrueHz Pro isn’t available in the store catalog yet. Confirm product com.playin432.app.truehz_pro is in the default RevenueCat offering.",
     );
   }
   return purchasePackage(pick);
@@ -227,12 +263,20 @@ export async function purchaseDefaultPro(): Promise<boolean> {
 
 export async function purchaseLite(): Promise<boolean> {
   const packages = await getPackages();
+  if (!packages.length) {
+    console.warn(
+      "[Pro] No RevenueCat packages when purchasing Lite — check App Store Connect + RevenueCat.",
+    );
+    throw new Error(
+      "App Store products didn’t load. Confirm TrueHz Lite/Pro are created in App Store Connect, attached to this version, and that the Paid Apps Agreement is Active — then try again.",
+    );
+  }
   const pick =
     packages.find((p) => p.key === "lite") ||
     packages.find((p) => p.tier === "lite");
   if (!pick) {
     throw new Error(
-      "Lite package not found. Add com.playin432.app.truehz_lite to the RevenueCat default offering.",
+      "TrueHz Lite isn’t available in the store catalog yet. Confirm product com.playin432.app.truehz_lite is in the default RevenueCat offering.",
     );
   }
   return purchasePackage(pick);

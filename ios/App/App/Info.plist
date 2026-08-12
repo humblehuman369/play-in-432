@@ -61,10 +61,13 @@
 	<string>Play In 432 only imports audio files. Photo library access is not required. Choose audio from the Files app if the system picker appears.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Play In 432 does not record audio. Microphone access is not required for playback or retune.</string>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>audio</string>
-	</array>
+	<!--
+	  UIBackgroundModes audio intentionally omitted (App Store Guideline 2.5.4).
+	  Playback uses Web Audio API while the app is active; we do not provide
+	  persistent background/lock-screen audio streams. Re-add only after
+	  implementing AVAudioSession + proven background playback and a review
+	  screen recording.
+	-->
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>spotify</string>

@@ -64,11 +64,15 @@ npm run mobile:run:android
 6. Background Modes: **Audio** (for continued playback)
 
 ### Google Play Console
+Full step-by-step (listing copy, data safety, IAP, AAB path): **[store-assets/GOOGLE_PLAY_SUBMIT.md](store-assets/GOOGLE_PLAY_SUBMIT.md)**
+
 1. Create app → package `com.playin432.app`
-2. Android Studio → **Build → Generate Signed App Bundle** (.aab)
-3. Data safety form: files on-device; network for Stripe/Spotify only
-4. Content rating questionnaire
-5. Production track → rollout
+2. Build signed AAB: `npm run mobile:bundle:android` (or Android Studio → **Generate Signed App Bundle**)
+3. Upload AAB under Internal testing first, then Production
+4. Data safety form: files on-device; network for checkout / Play Billing
+5. Content rating questionnaire
+6. Create IAP products + link RevenueCat Android (`com.playin432.app.truehz_lite` / `…truehz_pro`)
+7. Production track → rollout
 
 ## Stripe on mobile
 
